@@ -1,0 +1,28 @@
+{
+  "schema_version": 1,
+  "kind": "redacted-validation-summary",
+  "description": "从原始回执提取的公开摘要，省略本机路径及命令行；不替代原始 Archify 回执。",
+  "diagram_type": "workflow",
+  "tool_version": "3.0.1",
+  "source_revision": "b8e552ef88fbf8e916e61749c05d93a7a901eff9",
+  "specification": {
+    "file": "candidate.json",
+    "bytes": 17638,
+    "sha256": "05f23bd37435c9cca3c0e8aebba47d5deef177a7e412bc7e0fa34103fc588de2"
+  },
+  "artifact": {
+    "file": "bjx-royale-route.html",
+    "bytes": 780556,
+    "sha256": "33c2fadf2881359b572e034200b3336896a51edf6285472012104205d43208cb"
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "browser_evidence": "pass",
+  "visual_review": "pass",
+  "source_snapshot_sha256": "b0eb583b95ae6e74910a4898466252ce1863c3c27534c454af6b672478e039e8"
+}

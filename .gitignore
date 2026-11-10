@@ -1,0 +1,31 @@
+maafw/
+MXU.exe
+mxu.exe
+MFAAvalonia.exe
+*.log
+debug/
+__pycache__/
+.vs/
+node_modules/
+deps/
+install/
+config/
+MaaPiCli.exe
+cache/
+export/
+resource/model/ocr/
+resource/pipeline/scripts/
+resource/image/scripts/
+# 本机填写的账号密码；仓库仅保留空白表头模板。
+/accounts.csv
+/accounts.csv.*
+*.local.json
+build/
+# 原始工具回执可能包含用户名和安装路径；公开验证摘要另存为 validation.json。
+/.archify/**/*.delivery.json
+/.archify/**/*.finalize.json
+/.archify/**/*.finalize-summary.json
+/.archify/**/*.browser-check.json
+/.archify/**/*.visual-check.json
+# 游戏截图只用于本机回归，公开包保留采集说明和测试代码。
+/tests/fixtures/royale/*.png

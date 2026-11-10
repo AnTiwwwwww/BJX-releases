@@ -1,0 +1,6 @@
+# 路线图校验记录绑定生成文件的字节，保留原始换行。
+/.archify/** -text whitespace=cr-at-eol
+# HTML 模板带有行尾空格，保留已通过校验的产物。
+/.archify/**/*.html whitespace=cr-at-eol,-blank-at-eol
+# 保留上游 LGPL 许可原文中的 Markdown 行尾换行标记。
+/licenses/MaaFramework-LGPL-3.0.txt whitespace=-blank-at-eol

@@ -1,0 +1,206 @@
+{
+    "签到": {
+        "recognition": "DirectHit",
+        "action": "Command",
+        "exec": "{RESOURCE_DIR}/../tools/bjx-run.exe",
+        "args": [
+            "-NoProfile",
+            "-File",
+            "{RESOURCE_DIR}/../tools/remind-resolution.ps1",
+            "{ENTRY}"
+        ],
+        "timeout": 15000,
+        "next": [
+            "遇到登录验证",
+            "点已知关闭",
+            "签到回城",
+            "花萼楼已开",
+            "打开花萼楼"
+        ],
+        "on_error": [
+            "失败后回初始页"
+        ]
+    },
+    "打开花萼楼": {
+        "recognition": "OCR",
+        "expected": "花萼楼",
+        "roi": [1315, 16, 80, 90],
+        "action": "Click",
+        "timeout": 8000,
+        "post_delay": 1800,
+        "rate_limit": 400,
+        "next": [
+            "花萼楼已开"
+        ],
+        "on_error": [
+            "签到没看到字"
+        ]
+    },
+    "花萼楼已开": {
+        "recognition": "OCR",
+        "expected": "花萼楼",
+        "roi": [20, 10, 400, 120],
+        "action": "DoNothing",
+        "timeout": 6000,
+        "next": [
+            "关掉签到弹窗",
+            "点签筒",
+            "点每日签到",
+            "点签到领取",
+            "点活动红点"
+        ],
+        "on_error": [
+            "关闭花萼楼"
+        ]
+    },
+    "点每日签到": {
+        "recognition": "OCR",
+        "expected": "每日签到",
+        "roi": [163, 126, 280, 860],
+        "action": "Click",
+        "timeout": 4000,
+        "max_hit": 2,
+        "post_delay": 700,
+        "next": [
+            "关掉签到弹窗",
+            "点签筒",
+            "点签到领取",
+            "点活动红点",
+            "花萼楼已开"
+        ],
+        "on_error": [
+            "失败后回初始页"
+        ]
+    },
+    "点签筒": {
+        "recognition": "OCR",
+        "expected": [
+            "气运值",
+            "已累签"
+        ],
+        "roi": [700, 400, 1100, 550],
+        "action": "Click",
+        "target": [895, 453, 162, 216],
+        "timeout": 4000,
+        "max_hit": 1,
+        "post_delay": 800,
+        "next": [
+            "关掉签到弹窗",
+            "点签到领取",
+            "点活动红点",
+            "花萼楼已开"
+        ],
+        "on_error": [
+            "失败后回初始页"
+        ]
+    },
+    "签到金按钮": {
+        "recognition": "ColorMatch",
+        "method": 4,
+        "lower": [160, 140, 100],
+        "upper": [255, 240, 220],
+        "action": "DoNothing"
+    },
+    "点签到领取": {
+        "recognition": "OCR",
+        "expected": "签到领取",
+        "roi": [1453, 933, 327, 126],
+        "color_filter": "签到金按钮",
+        "action": "Click",
+        "timeout": 5000,
+        "max_hit": 3,
+        "post_delay": 800,
+        "next": [
+            "关掉签到弹窗",
+            "点活动红点",
+            "点签到领取",
+            "花萼楼已开"
+        ],
+        "on_error": [
+            "失败后回初始页"
+        ]
+    },
+    "关掉签到弹窗": {
+        "recognition": "OCR",
+        "expected": [
+            "点击空白区域关闭",
+            "已经放入少侠背包",
+            "添加到包裹"
+        ],
+        "roi": [400, 180, 1100, 700],
+        "action": "Click",
+        "target": [1453, 933, 327, 126],
+        "timeout": 5000,
+        "max_hit": 3,
+        "post_delay": 700,
+        "next": [
+            "关掉签到弹窗",
+            "点签筒",
+            "点签到领取",
+            "点活动红点",
+            "花萼楼已开"
+        ],
+        "on_error": [
+            "失败后回初始页"
+        ]
+    },
+    "点活动红点": {
+        "recognition": "ColorMatch",
+        "roi": [300, 280, 180, 720],
+        "method": 4,
+        "lower": [180, 40, 40],
+        "upper": [255, 160, 150],
+        "connected": true,
+        "count": 1,
+        "action": "Click",
+        "timeout": 4000,
+        "max_hit": 4,
+        "post_delay": 800,
+        "next": [
+            "关掉签到弹窗",
+            "点签到领取",
+            "点活动红点",
+            "花萼楼已开"
+        ],
+        "on_error": [
+            "关闭花萼楼"
+        ]
+    },
+    "关闭花萼楼": {
+        "recognition": "DirectHit",
+        "action": "ClickKey",
+        "key": 27,
+        "post_delay": 600,
+        "next": [
+            "回到初始页"
+        ]
+    },
+    "签到没看到字": {
+        "recognition": "DirectHit",
+        "action": "Screencap",
+        "filename": "sign-in-miss",
+        "next": [
+            "签到关掉并跳过"
+        ]
+    },
+    "签到关掉并跳过": {
+        "recognition": "DirectHit",
+        "action": "ClickKey",
+        "key": 27,
+        "post_delay": 500,
+        "next": [
+            "跳过并回初始页"
+        ]
+    },
+    "签到回城": {
+        "recognition": "OCR",
+        "expected": "回城复活",
+        "action": "Click",
+        "timeout": 600,
+        "max_hit": 2,
+        "post_delay": 1000,
+        "next": [
+            "签到"
+        ]
+    }
+}

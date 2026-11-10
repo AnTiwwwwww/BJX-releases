@@ -1,0 +1,583 @@
+{
+    "interface_version": 2,
+    "name": "BJX",
+    "label": "剑网3无界日常",
+    "title": "BJX 0.4.1-beta.1",
+    "version": "0.4.1-beta.1",
+    "github": "https://github.com/AnTiwwwwww/BJX-releases",
+    "license": "MIT",
+    "description": "剑网3无界的日常长草资源包。当前内测仅建议测试单人吃鸡刷币和定时开始，其余任务均未完成。吃鸡运行前请手动切换至旗舰心法。设置在对应任务里面。",
+    "welcome": "当前内测请只勾选「单人吃鸡刷币」和按需使用的「定时开始」，其余任务均标注未完成。先登录无界，手动切换至旗舰心法，使用窗口模式、客户区 1920×1080、界面缩放 100%。开始时会先打开最小化的无界，尺寸不对才会弹出提醒。要到点开跑，把「定时开始」放在列表最前面，勾选并设置时间，再点开始等待。吃鸡「运行到几点」默认为任务启动日期的次日凌晨 01:30。",
+    "import": [
+        "scripts/imported.json"
+    ],
+    "agent": {
+        "child_exec": "./tools/bjx-royale-clock.exe"
+    },
+    "controller": [
+        {
+            "name": "无界电脑端",
+            "label": "无界电脑端",
+            "description": "只绑定窗口类名为 KGWin32App 的剑网3无界。前台输入会激活游戏，点击会移动真实鼠标。网易 UU 远程请使用普通鼠标模式；若指针无法移出远程画面，在操控端键盘按 Ctrl+Alt+Enter 退出游戏鼠标模式。",
+            "type": "Win32",
+            "display_raw": true,
+            "display_short_side": 1080,
+            "win32": {
+                "class_regex": "KGWin32App",
+                "window_regex": "剑网3",
+                "screencap": "FramePool",
+                "mouse": "Seize",
+                "keyboard": "Seize"
+            }
+        }
+    ],
+    "resource": [
+        {
+            "name": "无界",
+            "label": "无界电脑端资源",
+            "description": "对应无界电脑端默认界面。旗舰版界面不在这套资源里。",
+            "path": [
+                "./resource"
+            ],
+            "controller": [
+                "无界电脑端"
+            ]
+        }
+    ],
+    "global_option": [
+        "重跑上限"
+    ],
+    "task": [
+        {
+            "name": "定时开始",
+            "label": "定时开始",
+            "entry": "定时开始",
+            "default_check": false,
+            "description": "在 MXU 中把这项放在任务列表最前面，勾选后设置开始时间，再点开始。保持 BJX 和已登录的游戏打开，到点后继续执行后面勾选的任务。使用本机时间，24 小时制；时间已过会等待到明天同一时间。每次运行只等待一次，吃鸡下一局不会再次等待。等待时可用停止按钮或 F11 取消。不需要定时时取消勾选。",
+            "option": [
+                "定时开始时间"
+            ]
+        },
+        {
+            "name": "切换账号",
+            "label": "切换账号（未完成）",
+            "entry": "切换账号",
+            "default_check": false,
+            "description": "【未完成】暂不作为内测可用任务。从菜单点「切换账号」，再点客户端已经显示出来的账号名。不填写密码，不处理登录验证。出现选服页就截图并停掉这一项。停在角色选择界面，进入世界要再勾切换角色。按钮文字来自公开说明，和实机不一致时改流水线。",
+            "option": [
+                "切换账号名"
+            ]
+        },
+        {
+            "name": "切换角色",
+            "label": "切换角色（未完成）",
+            "entry": "切换角色",
+            "default_check": false,
+            "description": "【未完成】暂不作为内测可用任务。点「切换角色」，再点填写的角色名，然后点「进入游戏」，直到看到主界面。已经在选人界面就直接点名字。不创建、不删除。出现要输入密码或安全验证就截图并停掉。按钮文字来自公开说明，和实机不一致时改流水线。",
+            "option": [
+                "切换角色名"
+            ]
+        },
+        {
+            "name": "领取邮件",
+            "label": "领取邮件（未完成）",
+            "entry": "领取邮件",
+            "default_check": false,
+            "description": "【未完成】暂不作为内测可用任务。先点右上角「菜单」，再点右侧「邮件」。亮的「全部领取」才点。灰色表示没有可领邮件，不点。关掉邮箱后，用右上角的关闭或 Esc 回到主界面，直到上方重新看到「花萼楼」「行记」「外观」这一排。没有「全部领取」时才逐封领取。这项没有单独的选项。"
+        },
+        {
+            "name": "大侠之路",
+            "label": "大侠之路（未完成）",
+            "entry": "大侠之路",
+            "default_check": false,
+            "description": "【未完成】暂不作为内测可用任务。点主界面上方的「侠」图标打开，角标写着「必做」。认出每一条。勾上的种类会做，没勾的种类点免费刷新换掉。卡片上有「已完成」就跳过。「浏览设计站」会点进设计站再退回。「查看沙盘界面」打得开才算完成。许愿树、名望、好友装备、名剑大会点这张卡片自己的「刷新」。做完领每日第 100 档，再点「每周」领宝箱。做完或这项失败，都用右上角的关闭或 Esc 回到主界面。",
+            "option": [
+                "好做条目"
+            ]
+        },
+        {
+            "name": "喝茶饼",
+            "label": "喝茶饼（未完成）",
+            "entry": "喝茶饼",
+            "default_check": false,
+            "description": "【未完成】暂不作为内测可用任务。点右上角「菜单」，再点「侠影」。勾了领取就点「点击领取」；已经是「今日已领」就跳过。勾了喝掉剩余，就打开筛选，先点「重置」，只勾「喝茶结交」，再点「确认」。然后把侠客列表滑到最右，点最右边那位，点「前往寻访」。亮的「开始翻阅」才点，变灰就停。结识弹窗点空白关掉。最后用右上角的关闭或 Esc 回到主界面。不花金币，不点单独的「前往」。",
+            "option": [
+                "喝茶饼选项"
+            ]
+        },
+        {
+            "name": "签到",
+            "label": "签到（未完成）",
+            "entry": "签到",
+            "default_check": false,
+            "description": "【未完成】暂不作为内测可用任务。点主界面上方「花萼楼」。每日签到点中间的签筒。左侧带红点的活动页上，亮的「签到领取」才点。奖励弹窗点「签到领取」那个位置关掉。不点「补签」，也不点其他活动按钮。做完用右上角的关闭或 Esc 回到主界面。"
+        },
+        {
+            "name": "单人吃鸡刷币",
+            "label": "单人吃鸡刷币",
+            "entry": "单人吃鸡刷币",
+            "default_check": false,
+            "description": "【内测提示】运行前请手动切换至旗舰心法。Ctrl+L 打开绝境战场，点「单人模式」，看到「龙门绝境」后，先记下底部「本周还可获得飞沙令」右边还剩多少，再点「个人匹配」。记录在 debug/royale-weekly-left.txt，并按本地邮件配置把这一条发出去。点下去后若出现「取消匹配」或「预计排队」，就是还在排队，不点取消，也不按 Esc。这两个字还在时不算打完。再次打开时若已在单人页，直接点「个人匹配」。提交匹配前，某一步没对上会重试；提交匹配后不再重开匹配页。确认正在排队之后，连续三次看不到「取消匹配」和「预计排队」后，还要看到右上角剩余人数才确认进局。局内大约每 10 秒按一次数字键 1，不按 2、3、4。进局满十分钟后，只在确认局内时按一次 Shift+C。这一局不重复；停止任务、排队、结算或回到主城时不按。每次按 1 之前先看结算。右下角出现「下一步」或「传出战场」就是这一把结束，等 2 分钟加载后再排下一把。提交匹配后只等待本局。必须先看到「下一步」「传出战场」或「退出战场」，等待加载并确认返回主城，才允许排下一局。没看到退出页时保持本局等待；正常准备和加载不因多局累计等待次数停止。MXU 的停止键以设置页为准，本机是 F11；UU 鼠标无法切出时在操控端按 Ctrl+Alt+Enter。达到飞沙令上限、所选局数或「运行到几点」的截止时间时结束。不寻路、不捡物资、不躲圈。飞沙令按名次由游戏自己结算。这是一项勾选，不是导入的脚本。",
+            "option": [
+                "吃鸡局数",
+                "吃鸡截止时间"
+            ]
+        },
+        {
+            "name": "导出日志",
+            "label": "导出日志（未完成）",
+            "entry": "导出日志",
+            "default_check": false,
+            "description": "【未完成】暂不作为内测可用任务。把当前日志和报错截图复制到 export 目录，并打开那个文件夹。不点击游戏。旧的超大备份日志不带上。"
+        },
+        {
+            "name": "探测游戏窗口",
+            "label": "探测游戏窗口（未完成）",
+            "entry": "探测前确认",
+            "default_check": false,
+            "description": "【未完成】暂不作为内测可用任务。只截一张图确认窗口画面，不点击。"
+        },
+        {
+            "name": "运行结束后操作",
+            "label": "运行结束后操作（未完成）",
+            "entry": "运行结束后操作",
+            "default_check": false,
+            "description": "【未完成】暂不作为内测可用任务。放在已勾选任务的最后。前面的任务都成功结束后，执行所选操作。需要 MXU 本机 Web 服务来核对本轮任务状态。",
+            "option": [
+                "结束后执行"
+            ]
+        }
+    ],
+    "option": {
+        "结束后执行": {
+            "type": "select",
+            "label": "结束后执行",
+            "default_case": "不操作",
+            "cases": [
+                {
+                    "name": "不操作",
+                    "label": "不操作"
+                },
+                {
+                    "name": "关闭BJX",
+                    "label": "关闭 BJX",
+                    "pipeline_override": {
+                        "运行结束后操作": {
+                            "args": ["-NoProfile", "-File", "{RESOURCE_DIR}/../tools/after-run.ps1", "close-bjx"]
+                        }
+                    }
+                },
+                {
+                    "name": "关闭无界窗口",
+                    "label": "关闭无界窗口",
+                    "pipeline_override": {
+                        "运行结束后操作": {
+                            "args": ["-NoProfile", "-File", "{RESOURCE_DIR}/../tools/after-run.ps1", "close-game"]
+                        }
+                    }
+                },
+                {
+                    "name": "关机",
+                    "label": "关机",
+                    "pipeline_override": {
+                        "运行结束后操作": {
+                            "args": ["-NoProfile", "-File", "{RESOURCE_DIR}/../tools/after-run.ps1", "shutdown"]
+                        }
+                    }
+                }
+            ]
+        },
+        "定时开始时间": {
+            "type": "input",
+            "label": "开始时间",
+            "description": "使用本机时间，格式 HH:mm。例如 14:00。时间已过会顺延到明天；等待期间保持电脑唤醒。",
+            "inputs": [
+                {
+                    "name": "target_time",
+                    "label": "几点开始",
+                    "default": "14:00",
+                    "pipeline_type": "string",
+                    "input_type": "time",
+                    "verify": "^([01][0-9]|2[0-3]):[0-5][0-9]$",
+                    "pattern_msg": "请选择 00:00 至 23:59 之间的开始时间"
+                }
+            ],
+            "pipeline_override": {
+                "定时开始": {
+                    "custom_action_param": {
+                        "target_time": "{target_time}"
+                    }
+                }
+            }
+        },
+        "重跑上限": {
+            "type": "select",
+            "label": "重跑上限",
+            "description": "一项因死亡或卡住而从头再跑的次数。整次运行共用。",
+            "default_case": "再跑2次",
+            "cases": [
+                {
+                    "name": "不重跑",
+                    "label": "不重跑",
+                    "pipeline_override": {
+                        "邮件回城": {
+                            "next": [
+                                "跳过并回初始页"
+                            ]
+                        },
+                        "大侠回城": {
+                            "next": [
+                                "跳过并回初始页"
+                            ]
+                        },
+                        "茶饼回城": {
+                            "next": [
+                                "跳过并回初始页"
+                            ]
+                        },
+                        "签到回城": {
+                            "next": [
+                                "跳过并回初始页"
+                            ]
+                        },
+                        "吃鸡回城": {
+                            "next": [
+                                "通知跳过"
+                            ]
+                        },
+                        "账号回城": {
+                            "next": [
+                                "通知跳过"
+                            ]
+                        },
+                        "角色回城": {
+                            "next": [
+                                "通知跳过"
+                            ]
+                        }
+                    }
+                },
+                {
+                    "name": "再跑1次",
+                    "label": "再跑 1 次",
+                    "pipeline_override": {
+                        "邮件回城": {
+                            "max_hit": 1
+                        },
+                        "大侠回城": {
+                            "max_hit": 1
+                        },
+                        "茶饼回城": {
+                            "max_hit": 1
+                        },
+                        "签到回城": {
+                            "max_hit": 1
+                        },
+                        "吃鸡回城": {
+                            "max_hit": 1
+                        },
+                        "账号回城": {
+                            "max_hit": 1
+                        },
+                        "角色回城": {
+                            "max_hit": 1
+                        }
+                    }
+                },
+                {
+                    "name": "再跑2次",
+                    "label": "再跑 2 次",
+                    "pipeline_override": {
+                        "邮件回城": {
+                            "max_hit": 2
+                        },
+                        "大侠回城": {
+                            "max_hit": 2
+                        },
+                        "茶饼回城": {
+                            "max_hit": 2
+                        },
+                        "签到回城": {
+                            "max_hit": 2
+                        },
+                        "吃鸡回城": {
+                            "max_hit": 2
+                        },
+                        "账号回城": {
+                            "max_hit": 2
+                        },
+                        "角色回城": {
+                            "max_hit": 2
+                        }
+                    }
+                },
+                {
+                    "name": "再跑3次",
+                    "label": "再跑 3 次",
+                    "pipeline_override": {
+                        "邮件回城": {
+                            "max_hit": 3
+                        },
+                        "大侠回城": {
+                            "max_hit": 3
+                        },
+                        "茶饼回城": {
+                            "max_hit": 3
+                        },
+                        "签到回城": {
+                            "max_hit": 3
+                        },
+                        "吃鸡回城": {
+                            "max_hit": 3
+                        },
+                        "账号回城": {
+                            "max_hit": 3
+                        },
+                        "角色回城": {
+                            "max_hit": 3
+                        }
+                    }
+                }
+            ]
+        },
+        "好做条目": {
+            "type": "checkbox",
+            "label": "好做条目",
+            "description": "没勾的种类会刷新掉。默认都勾上。",
+            "default_case": [
+                "战争沙盘",
+                "商城外观",
+                "奇遇手册",
+                "免费家园许愿",
+                "在线一分钟",
+                "召唤宠物",
+                "江湖笔记",
+                "茶饼或品茗",
+                "名片点赞"
+            ],
+            "cases": [
+                {
+                    "name": "战争沙盘",
+                    "label": "战争沙盘",
+                    "pipeline_override": {
+                        "做战争沙盘": {
+                            "enabled": true
+                        }
+                    }
+                },
+                {
+                    "name": "商城外观",
+                    "label": "商城外观",
+                    "pipeline_override": {
+                        "做商城外观": {
+                            "enabled": true
+                        }
+                    }
+                },
+                {
+                    "name": "奇遇手册",
+                    "label": "奇遇手册",
+                    "pipeline_override": {
+                        "做奇遇手册": {
+                            "enabled": true
+                        }
+                    }
+                },
+                {
+                    "name": "免费家园许愿",
+                    "label": "免费家园许愿",
+                    "pipeline_override": {
+                        "做家园许愿": {
+                            "enabled": true
+                        }
+                    }
+                },
+                {
+                    "name": "在线一分钟",
+                    "label": "在线一分钟",
+                    "pipeline_override": {
+                        "做在线一分钟": {
+                            "enabled": true
+                        }
+                    }
+                },
+                {
+                    "name": "召唤宠物",
+                    "label": "召唤宠物",
+                    "pipeline_override": {
+                        "做召唤宠物": {
+                            "enabled": true
+                        }
+                    }
+                },
+                {
+                    "name": "江湖笔记",
+                    "label": "江湖笔记",
+                    "pipeline_override": {
+                        "做江湖笔记": {
+                            "enabled": true
+                        }
+                    }
+                },
+                {
+                    "name": "茶饼或品茗",
+                    "label": "领取茶饼或品茗",
+                    "pipeline_override": {
+                        "做领取茶饼": {
+                            "enabled": true
+                        }
+                    }
+                },
+                {
+                    "name": "名片点赞",
+                    "label": "给侠士名片点赞",
+                    "pipeline_override": {
+                        "做名片点赞": {
+                            "enabled": true
+                        }
+                    }
+                }
+            ]
+        },
+        "喝茶饼选项": {
+            "type": "checkbox",
+            "label": "喝茶饼",
+            "description": "暂时只有这两项。都不花金币。",
+            "default_case": [
+                "领取当天免费茶饼",
+                "喝掉剩余免费茶饼"
+            ],
+            "cases": [
+                {
+                    "name": "领取当天免费茶饼",
+                    "label": "领取当天免费茶饼",
+                    "pipeline_override": {
+                        "领取当天免费茶饼": {
+                            "enabled": true
+                        }
+                    }
+                },
+                {
+                    "name": "喝掉剩余免费茶饼",
+                    "label": "喝掉身上剩余的免费茶饼",
+                    "pipeline_override": {
+                        "喝掉剩余免费茶饼": {
+                            "enabled": true
+                        }
+                    }
+                }
+            ]
+        },
+        "切换账号名": {
+            "type": "input",
+            "label": "账号名",
+            "description": "填写账号列表上已经显示的名字或尾号。这里没有密码栏。",
+            "inputs": [
+                {
+                    "name": "账号名",
+                    "label": "画面上的账号名",
+                    "description": "与客户端列表上的文字一致。不要填写密码。",
+                    "pipeline_type": "string",
+                    "verify": "^.{1,32}$",
+                    "pattern_msg": "填写 1 到 32 个字，与画面上的账号名一致"
+                }
+            ],
+            "pipeline_override": {
+                "点选账号名": {
+                    "expected": [
+                        "{账号名}"
+                    ]
+                }
+            }
+        },
+        "切换角色名": {
+            "type": "input",
+            "label": "角色名",
+            "description": "填写角色选择界面上的名字。只点击这个名字。",
+            "inputs": [
+                {
+                    "name": "角色名",
+                    "label": "角色名",
+                    "description": "与角色选择界面上的名字一致。",
+                    "pipeline_type": "string",
+                    "verify": "^.{1,16}$",
+                    "pattern_msg": "填写 1 到 16 个字的角色名"
+                }
+            ],
+            "pipeline_override": {
+                "点选角色名": {
+                    "expected": [
+                        "{角色名}"
+                    ]
+                }
+            }
+        },
+        "吃鸡截止时间": {
+            "type": "input",
+            "label": "运行到几点",
+            "description": "使用本机时间，固定为吃鸡任务启动日期的次日，默认次日凌晨 01:30。例如 11 月 10 日启动（包括凌晨 01:30 前），截止时间都是 11 月 11 日 01:30；修改时间也按次日计算。同一次任务跨午夜、排下一局时不顺延。到点结束吃鸡，飞沙令归零或打满所选局数可提前结束。",
+            "inputs": [
+                {
+                    "name": "cutoff_time",
+                    "label": "次日截止时间",
+                    "default": "01:30",
+                    "pipeline_type": "string",
+                    "input_type": "time",
+                    "verify": "^([01][0-9]|2[0-3]):[0-5][0-9]$",
+                    "pattern_msg": "请选择 00:00 至 23:59 之间的截止时间"
+                }
+            ],
+            "pipeline_override": {
+                "单人吃鸡刷币": {
+                    "custom_action_param": "{cutoff_time}"
+                }
+            }
+        },
+        "吃鸡局数": {
+            "type": "select",
+            "label": "打到",
+            "description": "默认一直打，直到底部「本周还可获得飞沙令」右边的数字为 0。不看上面的卡片。每次匹配前把这个剩余数记到 debug/royale-weekly-left.txt，并按本地邮件配置把这一条发出去。大于 0 就再排。结束后游戏自己回主城。也可以改成只打固定局数。",
+            "default_case": "打到上限",
+            "cases": [
+                {
+                    "name": "打到上限",
+                    "label": "打到代币上限",
+                    "pipeline_override": {
+                        "再来一局": {
+                            "enabled": true
+                        }
+                    }
+                },
+                {
+                    "name": "打1局",
+                    "label": "打 1 局",
+                    "pipeline_override": {
+                        "再来一局": {
+                            "enabled": false
+                        }
+                    }
+                },
+                {
+                    "name": "打2局",
+                    "label": "打 2 局",
+                    "pipeline_override": {
+                        "再来一局": {
+                            "enabled": true,
+                            "max_hit": 1
+                        }
+                    }
+                },
+                {
+                    "name": "打3局",
+                    "label": "打 3 局",
+                    "pipeline_override": {
+                        "再来一局": {
+                            "enabled": true,
+                            "max_hit": 2
+                        }
+                    }
+                }
+            ]
+        }
+    }
+}

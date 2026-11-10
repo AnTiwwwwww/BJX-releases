@@ -1,0 +1,334 @@
+{
+    "点已知关闭": {
+        "recognition": "OCR",
+        "expected": "已知弹窗关闭",
+        "action": "Click",
+        "timeout": 400,
+        "post_delay": 300
+    },
+    "本项失败": {
+        "recognition": "OCR",
+        "expected": "本项失败占位",
+        "timeout": 200
+    },
+    "留下截图": {
+        "focus": { "Node.Recognition.Succeeded": "BJX 这一步没对上，留下截图并跳过" },
+        "recognition": "DirectHit",
+        "action": "Screencap",
+        "next": [
+            "通知跳过"
+        ]
+    },
+    "失败后回初始页": {
+        "focus": { "Node.Recognition.Succeeded": "BJX 这项失败，先回主界面" },
+        "recognition": "DirectHit",
+        "action": "Screencap",
+        "filename": "task-failed",
+        "next": [
+            "跳过并回初始页"
+        ]
+    },
+    "遇到登录验证": {
+        "focus": { "Node.Recognition.Succeeded": "BJX 遇到登录或验证，停止" },
+        "recognition": "OCR",
+        "expected": [
+            "请输入密码",
+            "登录验证",
+            "安全验证",
+            "拖动滑块"
+        ],
+        "action": "DoNothing",
+        "timeout": 1000,
+        "next": [
+            "登录验证截图"
+        ]
+    },
+    "登录验证截图": {
+        "recognition": "DirectHit",
+        "action": "Screencap",
+        "filename": "login-verify",
+        "next": [
+            "通知停掉"
+        ]
+    },
+    "停掉当前项": {
+        "recognition": "DirectHit",
+        "action": "StopTask"
+    },
+    "通知完成": {
+        "focus": { "Node.Recognition.Succeeded": "BJX 这项完成" },
+        "recognition": "DirectHit",
+        "action": "Command",
+        "exec": "{RESOURCE_DIR}/../tools/bjx-run.exe",
+        "args": [
+            "-NoProfile",
+            "-File",
+            "{RESOURCE_DIR}/../tools/notify-wecom.ps1",
+            "{ENTRY}",
+            "ok"
+        ],
+        "on_error": [
+            "通知发送失败"
+        ]
+    },
+    "通知跳过": {
+        "focus": { "Node.Recognition.Succeeded": "BJX 这项跳过" },
+        "recognition": "DirectHit",
+        "action": "Command",
+        "exec": "{RESOURCE_DIR}/../tools/bjx-run.exe",
+        "args": [
+            "-NoProfile",
+            "-File",
+            "{RESOURCE_DIR}/../tools/notify-wecom.ps1",
+            "{ENTRY}",
+            "skip"
+        ],
+        "timeout": 800,
+        "next": [
+            "本项失败"
+        ]
+    },
+    "通知停掉": {
+        "focus": { "Node.Recognition.Succeeded": "BJX 停掉这次运行" },
+        "recognition": "DirectHit",
+        "action": "Command",
+        "exec": "{RESOURCE_DIR}/../tools/bjx-run.exe",
+        "args": [
+            "-NoProfile",
+            "-File",
+            "{RESOURCE_DIR}/../tools/notify-wecom.ps1",
+            "{ENTRY}",
+            "stop"
+        ],
+        "next": [
+            "停掉当前项"
+        ],
+        "on_error": [
+            "停掉当前项"
+        ]
+    },
+    "通知发送失败": {
+        "recognition": "DirectHit",
+        "action": "DoNothing"
+    },
+    "回到初始页": {
+        "recognition": "DirectHit",
+        "action": "DoNothing",
+        "post_delay": 300,
+        "timeout": 1800,
+        "next": [
+            "已看到初始页"
+        ],
+        "on_error": [
+            "初始页按Esc1"
+        ]
+    },
+    "已看到初始页": {
+        "focus": { "Node.Recognition.Succeeded": "BJX 回到主界面" },
+        "recognition": "OCR",
+        "expected": [
+            "花萼楼",
+            "行记",
+            "外观",
+            "背包",
+            "角色"
+        ],
+        "roi": [1165, 0, 560, 110],
+        "action": "DoNothing",
+        "next": [
+            "通知完成"
+        ]
+    },
+    "初始页按Esc1": {
+        "recognition": "DirectHit",
+        "action": "ClickKey",
+        "key": 27,
+        "post_delay": 600,
+        "timeout": 1800,
+        "next": [
+            "已看到初始页"
+        ],
+        "on_error": [
+            "初始页点关闭1"
+        ]
+    },
+    "初始页点关闭1": {
+        "recognition": "DirectHit",
+        "action": "Click",
+        "target": [1817, 7, 97, 85],
+        "post_delay": 600,
+        "timeout": 1800,
+        "next": [
+            "已看到初始页"
+        ],
+        "on_error": [
+            "初始页按Esc2"
+        ]
+    },
+    "初始页按Esc2": {
+        "recognition": "DirectHit",
+        "action": "ClickKey",
+        "key": 27,
+        "post_delay": 600,
+        "timeout": 1800,
+        "next": [
+            "已看到初始页"
+        ],
+        "on_error": [
+            "初始页点关闭2"
+        ]
+    },
+    "初始页点关闭2": {
+        "recognition": "DirectHit",
+        "action": "Click",
+        "target": [1817, 7, 97, 85],
+        "post_delay": 600,
+        "timeout": 1800,
+        "next": [
+            "已看到初始页"
+        ],
+        "on_error": [
+            "初始页按Esc3"
+        ]
+    },
+    "初始页按Esc3": {
+        "recognition": "DirectHit",
+        "action": "ClickKey",
+        "key": 27,
+        "post_delay": 600,
+        "timeout": 1800,
+        "next": [
+            "已看到初始页"
+        ],
+        "on_error": [
+            "初始页点关闭3"
+        ]
+    },
+    "初始页点关闭3": {
+        "recognition": "DirectHit",
+        "action": "Click",
+        "target": [1817, 7, 97, 85],
+        "post_delay": 600,
+        "timeout": 1800,
+        "next": [
+            "已看到初始页"
+        ],
+        "on_error": [
+            "回不到初始页"
+        ]
+    },
+    "回不到初始页": {
+        "focus": { "Node.Recognition.Succeeded": "BJX 回不到主界面，停止" },
+        "recognition": "DirectHit",
+        "action": "Screencap",
+        "filename": "not-home",
+        "next": [
+            "通知停掉"
+        ]
+    },
+    "跳过并回初始页": {
+        "recognition": "DirectHit",
+        "action": "DoNothing",
+        "post_delay": 300,
+        "timeout": 1800,
+        "next": [
+            "跳过时看到初始页"
+        ],
+        "on_error": [
+            "跳过按Esc1"
+        ]
+    },
+    "跳过时看到初始页": {
+        "recognition": "OCR",
+        "expected": [
+            "花萼楼",
+            "行记",
+            "外观",
+            "背包",
+            "角色"
+        ],
+        "roi": [1165, 0, 560, 110],
+        "action": "DoNothing",
+        "next": [
+            "通知跳过"
+        ]
+    },
+    "跳过按Esc1": {
+        "recognition": "DirectHit",
+        "action": "ClickKey",
+        "key": 27,
+        "post_delay": 600,
+        "timeout": 1800,
+        "next": [
+            "跳过时看到初始页"
+        ],
+        "on_error": [
+            "跳过点关闭1"
+        ]
+    },
+    "跳过点关闭1": {
+        "recognition": "DirectHit",
+        "action": "Click",
+        "target": [1817, 7, 97, 85],
+        "post_delay": 600,
+        "timeout": 1800,
+        "next": [
+            "跳过时看到初始页"
+        ],
+        "on_error": [
+            "跳过按Esc2"
+        ]
+    },
+    "跳过按Esc2": {
+        "recognition": "DirectHit",
+        "action": "ClickKey",
+        "key": 27,
+        "post_delay": 600,
+        "timeout": 1800,
+        "next": [
+            "跳过时看到初始页"
+        ],
+        "on_error": [
+            "跳过点关闭2"
+        ]
+    },
+    "跳过点关闭2": {
+        "recognition": "DirectHit",
+        "action": "Click",
+        "target": [1817, 7, 97, 85],
+        "post_delay": 600,
+        "timeout": 1800,
+        "next": [
+            "跳过时看到初始页"
+        ],
+        "on_error": [
+            "跳过按Esc3"
+        ]
+    },
+    "跳过按Esc3": {
+        "recognition": "DirectHit",
+        "action": "ClickKey",
+        "key": 27,
+        "post_delay": 600,
+        "timeout": 1800,
+        "next": [
+            "跳过时看到初始页"
+        ],
+        "on_error": [
+            "跳过点关闭3"
+        ]
+    },
+    "跳过点关闭3": {
+        "recognition": "DirectHit",
+        "action": "Click",
+        "target": [1817, 7, 97, 85],
+        "post_delay": 600,
+        "timeout": 1800,
+        "next": [
+            "跳过时看到初始页"
+        ],
+        "on_error": [
+            "回不到初始页"
+        ]
+    }
+}

@@ -1,0 +1,158 @@
+{
+    "领取邮件": {
+        "recognition": "DirectHit",
+        "action": "Command",
+        "exec": "{RESOURCE_DIR}/../tools/bjx-run.exe",
+        "args": [
+            "-NoProfile",
+            "-File",
+            "{RESOURCE_DIR}/../tools/remind-resolution.ps1",
+            "{ENTRY}"
+        ],
+        "timeout": 8000,
+        "next": [
+            "遇到登录验证",
+            "点已知关闭",
+            "邮件回城",
+            "点全部领取",
+            "没有可领邮件",
+            "打开邮件菜单"
+        ],
+        "on_error": [
+            "失败后回初始页"
+        ]
+    },
+    "打开邮件菜单": {
+        "recognition": "OCR",
+        "expected": "菜单",
+        "roi": [1838, 15, 82, 80],
+        "action": "Click",
+        "timeout": 8000,
+        "post_delay": 800,
+        "rate_limit": 400,
+        "next": [
+            "寻找邮件入口",
+            "邮件菜单已开"
+        ],
+        "on_error": [
+            "邮件菜单没有邮件"
+        ]
+    },
+    "邮件菜单已开": {
+        "recognition": "OCR",
+        "expected": [
+            "设置",
+            "公告",
+            "帮助",
+            "切换账号",
+            "切换角色"
+        ],
+        "action": "DoNothing",
+        "next": [
+            "邮件菜单没有邮件"
+        ]
+    },
+    "邮件菜单没有邮件": {
+        "recognition": "DirectHit",
+        "action": "Screencap",
+        "filename": "mail-menu-miss",
+        "next": [
+            "关掉邮件菜单并跳过"
+        ]
+    },
+    "关掉邮件菜单并跳过": {
+        "recognition": "DirectHit",
+        "action": "DoNothing",
+        "next": [
+            "跳过并回初始页"
+        ]
+    },
+    "寻找邮件入口": {
+        "recognition": "OCR",
+        "expected": "邮件",
+        "roi": [1790, 243, 127, 119],
+        "action": "Click",
+        "timeout": 8000,
+        "post_delay": 800,
+        "rate_limit": 400,
+        "next": [
+            "邮件回城",
+            "点全部领取",
+            "没有可领邮件",
+            "点逐封领取"
+        ],
+        "on_error": [
+            "邮件界面没有领取"
+        ]
+    },
+    "邮件界面没有领取": {
+        "recognition": "DirectHit",
+        "action": "Screencap",
+        "filename": "mail-miss",
+        "next": [
+            "关掉邮件菜单并跳过"
+        ]
+    },
+    "邮件亮字": {
+        "recognition": "ColorMatch",
+        "method": 4,
+        "lower": [170, 170, 170],
+        "upper": [255, 255, 255],
+        "action": "DoNothing"
+    },
+    "点全部领取": {
+        "recognition": "OCR",
+        "expected": "全部领取",
+        "roi": [259, 940, 330, 117],
+        "color_filter": "邮件亮字",
+        "action": "Click",
+        "timeout": 2000,
+        "post_delay": 500,
+        "next": [
+            "关闭邮箱"
+        ]
+    },
+    "没有可领邮件": {
+        "recognition": "OCR",
+        "expected": "全部领取",
+        "roi": [259, 940, 330, 117],
+        "action": "DoNothing",
+        "next": [
+            "关闭邮箱"
+        ]
+    },
+    "点逐封领取": {
+        "recognition": "OCR",
+        "expected": "^领取$",
+        "action": "Click",
+        "timeout": 1500,
+        "max_hit": 20,
+        "post_delay": 400,
+        "next": [
+            "点逐封领取"
+        ],
+        "on_error": [
+            "关闭邮箱"
+        ]
+    },
+    "关闭邮箱": {
+        "recognition": "DirectHit",
+        "action": "ClickKey",
+        "key": 27,
+        "post_delay": 500,
+        "next": [
+            "回到初始页"
+        ]
+    },
+    "邮件回城": {
+        "recognition": "OCR",
+        "expected": "回城复活",
+        "action": "Click",
+        "timeout": 600,
+        "max_hit": 2,
+        "post_delay": 1000,
+        "next": [
+            "领取邮件"
+        ]
+    }
+}

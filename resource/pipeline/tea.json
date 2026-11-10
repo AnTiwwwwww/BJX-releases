@@ -1,0 +1,396 @@
+{
+    "喝茶饼": {
+        "recognition": "DirectHit",
+        "action": "Command",
+        "exec": "{RESOURCE_DIR}/../tools/bjx-run.exe",
+        "args": [
+            "-NoProfile",
+            "-File",
+            "{RESOURCE_DIR}/../tools/remind-resolution.ps1",
+            "{ENTRY}"
+        ],
+        "timeout": 10000,
+        "next": [
+            "遇到登录验证",
+            "点已知关闭",
+            "茶饼回城",
+            "红尘侠影已开",
+            "茶饼菜单里有侠影",
+            "打开茶饼菜单"
+        ],
+        "on_error": [
+            "茶饼没对上"
+        ]
+    },
+    "打开茶饼菜单": {
+        "recognition": "OCR",
+        "expected": "菜单",
+        "roi": [1830, 8, 90, 100],
+        "action": "Click",
+        "timeout": 8000,
+        "post_delay": 800,
+        "rate_limit": 400,
+        "next": [
+            "茶饼菜单里有侠影"
+        ],
+        "on_error": [
+            "茶饼没对上"
+        ]
+    },
+    "茶饼菜单里有侠影": {
+        "recognition": "OCR",
+        "expected": "侠影",
+        "roi": [1610, 350, 190, 180],
+        "action": "Click",
+        "timeout": 8000,
+        "post_delay": 1200,
+        "next": [
+            "红尘侠影已开"
+        ],
+        "on_error": [
+            "茶饼没对上"
+        ]
+    },
+    "红尘侠影已开": {
+        "recognition": "OCR",
+        "expected": [
+            "江湖侠客",
+            "共鸣配置",
+            "助战配置",
+            "侠客出行"
+        ],
+        "roi": [0, 940, 900, 140],
+        "action": "DoNothing",
+        "timeout": 8000,
+        "next": [
+            "关掉茶饼弹窗",
+            "领取当天免费茶饼",
+            "喝掉剩余免费茶饼",
+            "关闭侠影面板"
+        ],
+        "on_error": [
+            "茶饼没对上"
+        ]
+    },
+    "领取当天免费茶饼": {
+        "enabled": false,
+        "recognition": "OCR",
+        "expected": "点击领取",
+        "roi": [1470, 920, 400, 155],
+        "action": "Click",
+        "timeout": 4000,
+        "max_hit": 1,
+        "post_delay": 800,
+        "next": [
+            "关掉茶饼弹窗",
+            "喝掉剩余免费茶饼",
+            "关闭侠影面板"
+        ],
+        "on_error": [
+            "茶饼没对上"
+        ]
+    },
+    "喝掉剩余免费茶饼": {
+        "enabled": false,
+        "recognition": "OCR",
+        "expected": [
+            "江湖侠客",
+            "共鸣配置",
+            "助战配置",
+            "侠客出行"
+        ],
+        "roi": [0, 940, 900, 140],
+        "action": "Click",
+        "target": [1664, 15, 98, 75],
+        "timeout": 5000,
+        "max_hit": 1,
+        "post_delay": 700,
+        "next": [
+            "点筛选重置"
+        ],
+        "on_error": [
+            "茶饼没对上"
+        ]
+    },
+    "点筛选重置": {
+        "recognition": "OCR",
+        "expected": "重置",
+        "roi": [1190, 488, 240, 80],
+        "action": "Click",
+        "timeout": 4000,
+        "max_hit": 1,
+        "post_delay": 400,
+        "next": [
+            "勾喝茶结交"
+        ],
+        "on_error": [
+            "茶饼没对上"
+        ]
+    },
+    "勾喝茶结交": {
+        "recognition": "OCR",
+        "expected": "喝茶结交",
+        "roi": [1360, 50, 360, 130],
+        "action": "Click",
+        "target": [1425, 80, 229, 76],
+        "timeout": 4000,
+        "max_hit": 1,
+        "post_delay": 300,
+        "next": [
+            "点筛选确认"
+        ],
+        "on_error": [
+            "茶饼没对上"
+        ]
+    },
+    "点筛选确认": {
+        "recognition": "OCR",
+        "expected": "确认",
+        "roi": [1430, 488, 240, 80],
+        "action": "Click",
+        "timeout": 6000,
+        "max_hit": 1,
+        "post_delay": 1000,
+        "next": [
+            "筛选弹窗已关"
+        ],
+        "on_error": [
+            "茶饼没对上"
+        ]
+    },
+    "筛选弹窗已关": {
+        "recognition": "OCR",
+        "expected": "重置",
+        "roi": [1190, 488, 240, 80],
+        "inverse": true,
+        "action": "DoNothing",
+        "timeout": 4000,
+        "next": [
+            "滑到最新侠客"
+        ],
+        "on_error": [
+            "茶饼没对上"
+        ]
+    },
+    "滑到最新侠客": {
+        "recognition": "OCR",
+        "expected": [
+            "江湖侠客",
+            "共鸣配置",
+            "助战配置",
+            "侠客出行"
+        ],
+        "roi": [0, 940, 900, 140],
+        "action": "Swipe",
+        "begin": [1620, 500],
+        "end": [280, 500],
+        "duration": 450,
+        "end_hold": 120,
+        "repeat": 4,
+        "repeat_delay": 350,
+        "post_delay": 500,
+        "max_hit": 1,
+        "timeout": 8000,
+        "next": [
+            "点最右侠客"
+        ],
+        "on_error": [
+            "茶饼没对上"
+        ]
+    },
+    "点最右侠客": {
+        "recognition": "OCR",
+        "expected": [
+            "江湖侠客",
+            "共鸣配置",
+            "助战配置",
+            "侠客出行"
+        ],
+        "roi": [0, 940, 900, 140],
+        "action": "Click",
+        "target": [1655, 380, 150, 280],
+        "timeout": 8000,
+        "max_hit": 1,
+        "post_delay": 900,
+        "next": [
+            "点前往寻访"
+        ],
+        "on_error": [
+            "茶饼没对上"
+        ]
+    },
+    "点前往寻访": {
+        "recognition": "OCR",
+        "expected": "前往寻访",
+        "roi": [1200, 930, 450, 150],
+        "action": "Click",
+        "timeout": 10000,
+        "max_hit": 1,
+        "post_delay": 1500,
+        "next": [
+            "关掉茶饼弹窗",
+            "点开始翻阅",
+            "翻阅按钮变灰"
+        ],
+        "on_error": [
+            "茶饼没对上"
+        ]
+    },
+    "点开始翻阅": {
+        "recognition": "ColorMatch",
+        "roi": [1435, 880, 260, 70],
+        "method": 4,
+        "lower": [200, 200, 200],
+        "upper": [255, 255, 255],
+        "count": 200,
+        "action": "Click",
+        "target": [1420, 870, 320, 90],
+        "timeout": 8000,
+        "max_hit": 12,
+        "post_delay": 1200,
+        "next": [
+            "关掉茶饼弹窗",
+            "点开始翻阅",
+            "翻阅按钮变灰"
+        ],
+        "on_error": [
+            "茶饼没对上"
+        ]
+    },
+    "翻阅按钮变灰": {
+        "recognition": "OCR",
+        "expected": "开始翻阅",
+        "roi": [1400, 860, 420, 150],
+        "action": "DoNothing",
+        "timeout": 4000,
+        "next": [
+            "退出寻访"
+        ],
+        "on_error": [
+            "茶饼没对上"
+        ]
+    },
+    "关掉茶饼弹窗": {
+        "recognition": "OCR",
+        "expected": [
+            "点击空白关闭",
+            "点击空白区域关闭",
+            "未能结识"
+        ],
+        "roi": [360, 940, 1200, 130],
+        "action": "Click",
+        "target": [40, 400, 140, 180],
+        "timeout": 8000,
+        "max_hit": 12,
+        "post_delay": 800,
+        "next": [
+            "关掉茶饼弹窗",
+            "点开始翻阅",
+            "翻阅按钮变灰",
+            "喝掉剩余免费茶饼",
+            "关闭侠影面板"
+        ],
+        "on_error": [
+            "茶饼没对上"
+        ]
+    },
+    "退出寻访": {
+        "recognition": "OCR",
+        "expected": [
+            "开始翻阅",
+            "喝茶次数"
+        ],
+        "roi": [1100, 820, 700, 220],
+        "action": "Click",
+        "target": [1823, 22, 46, 46],
+        "timeout": 8000,
+        "max_hit": 1,
+        "post_delay": 800,
+        "next": [
+            "红尘侠影已开",
+            "关闭茶饼菜单",
+            "确认茶饼主界面"
+        ],
+        "on_error": [
+            "回到初始页"
+        ]
+    },
+    "关闭侠影面板": {
+        "recognition": "OCR",
+        "expected": [
+            "江湖侠客",
+            "共鸣配置",
+            "助战配置",
+            "侠客出行"
+        ],
+        "roi": [0, 940, 900, 140],
+        "action": "Click",
+        "target": [1823, 22, 46, 46],
+        "timeout": 6000,
+        "max_hit": 2,
+        "post_delay": 700,
+        "next": [
+            "关闭茶饼菜单",
+            "确认茶饼主界面",
+            "关闭侠影面板"
+        ],
+        "on_error": [
+            "回到初始页"
+        ]
+    },
+    "关闭茶饼菜单": {
+        "recognition": "OCR",
+        "expected": "侠影",
+        "roi": [1610, 350, 190, 180],
+        "action": "Click",
+        "target": [1823, 22, 46, 46],
+        "timeout": 5000,
+        "max_hit": 2,
+        "post_delay": 600,
+        "next": [
+            "确认茶饼主界面",
+            "关闭茶饼菜单"
+        ],
+        "on_error": [
+            "回到初始页"
+        ]
+    },
+    "确认茶饼主界面": {
+        "recognition": "OCR",
+        "expected": [
+            "花萼楼",
+            "行记",
+            "外观",
+            "背包",
+            "角色"
+        ],
+        "roi": [1165, 0, 560, 110],
+        "action": "DoNothing",
+        "timeout": 6000,
+        "next": [
+            "通知完成"
+        ],
+        "on_error": [
+            "回到初始页"
+        ]
+    },
+    "茶饼回城": {
+        "recognition": "OCR",
+        "expected": "回城复活",
+        "action": "Click",
+        "timeout": 600,
+        "max_hit": 2,
+        "post_delay": 1000,
+        "next": [
+            "喝茶饼"
+        ]
+    },
+    "茶饼没对上": {
+        "recognition": "DirectHit",
+        "action": "Screencap",
+        "filename": "tea-miss",
+        "next": [
+            "跳过并回初始页"
+        ]
+    }
+}

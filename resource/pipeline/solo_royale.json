@@ -1,0 +1,819 @@
+{
+    "单人吃鸡刷币": {
+        "recognition": "DirectHit",
+        "action": "Custom",
+        "custom_action": "BJX_ROYALE_SET_DEADLINE",
+        "custom_action_param": "01:30",
+        "next": [
+            "吃鸡检查窗口"
+        ]
+    },
+    "吃鸡检查窗口": {
+        "recognition": "DirectHit",
+        "action": "Command",
+        "exec": "{RESOURCE_DIR}/../tools/bjx-run.exe",
+        "args": [
+            "-NoProfile",
+            "-File",
+            "{RESOURCE_DIR}/../tools/remind-resolution.ps1",
+            "{ENTRY}"
+        ],
+        "timeout": 8000,
+        "on_error": [
+            "留下截图"
+        ],
+        "next": [
+            "吃鸡识别入口"
+        ]
+    },
+    "吃鸡识别入口": {
+        "recognition": "DirectHit",
+        "action": "Custom",
+        "custom_action": "BJX_ROYALE_CHECK_DEADLINE",
+        "pre_delay": 0,
+        "post_delay": 0,
+        "next": [
+            "遇到登录验证",
+            "点已知关闭",
+            "吃鸡回城",
+            "吃鸡判断主城"
+        ]
+    },
+    "吃鸡判断主城": {
+        "recognition": "DirectHit",
+        "action": "DoNothing",
+        "pre_delay": 0,
+        "post_delay": 0,
+        "next": [
+            "主城打开绝境",
+            "吃鸡判断主界面"
+        ]
+    },
+    "主城打开绝境": {
+        "focus": { "Node.Recognition.Succeeded": "BJX 在沧海集，打开绝境匹配" },
+        "recognition": "OCR",
+        "expected": "沧海集",
+        "roi": [1680, 140, 200, 70],
+        "action": "Custom",
+        "custom_action": "BJX_ROYALE_CHECK_DEADLINE",
+        "next": [
+            "打开绝境"
+        ]
+    },
+    "吃鸡判断主界面": {
+        "recognition": "DirectHit",
+        "action": "DoNothing",
+        "pre_delay": 0,
+        "post_delay": 0,
+        "next": [
+            "主界面打开绝境",
+            "吃鸡检查绝境面板"
+        ]
+    },
+    "主界面打开绝境": {
+        "recognition": "Or",
+        "any_of": [
+            {
+                "recognition": "And",
+                "all_of": [
+                    { "recognition": "OCR", "expected": "花萼楼", "roi": [1250, 0, 150, 120] },
+                    { "recognition": "OCR", "expected": "行记", "roi": [1380, 0, 110, 120] }
+                ]
+            },
+            {
+                "recognition": "And",
+                "all_of": [
+                    { "recognition": "OCR", "expected": "花萼楼", "roi": [1300, 60, 100, 35] },
+                    { "recognition": "OCR", "expected": "行记", "roi": [1390, 60, 75, 35] }
+                ]
+            }
+        ],
+        "action": "Custom",
+        "custom_action": "BJX_ROYALE_CHECK_DEADLINE",
+        "next": [
+            "打开绝境"
+        ]
+    },
+    "吃鸡检查绝境面板": {
+        "recognition": "DirectHit",
+        "action": "DoNothing",
+        "pre_delay": 0,
+        "post_delay": 0,
+        "next": [
+            "确认绝境已开",
+            "吃鸡检查排队"
+        ]
+    },
+    "吃鸡检查排队": {
+        "recognition": "DirectHit",
+        "action": "DoNothing",
+        "pre_delay": 0,
+        "post_delay": 0,
+        "next": [
+            "确认正在匹配",
+            "吃鸡检查结算"
+        ]
+    },
+    "吃鸡检查结算": {
+        "recognition": "DirectHit",
+        "action": "DoNothing",
+        "pre_delay": 0,
+        "post_delay": 0,
+        "next": [
+            "看到结算",
+            "吃鸡检查局内"
+        ]
+    },
+    "吃鸡检查局内": {
+        "recognition": "DirectHit",
+        "action": "DoNothing",
+        "pre_delay": 0,
+        "post_delay": 0,
+        "timeout": 3000,
+        "next": [
+            "确认已在局内",
+            "吃鸡未知画面等待"
+        ],
+        "on_error": [
+            "留下截图"
+        ]
+    },
+    "确认已在局内": {
+        "focus": { "Node.Recognition.Succeeded": "BJX 看到局内剩余人数" },
+        "recognition": "OCR",
+        "expected": "剩余[:：]?\\s*[0-9]+",
+        "roi": [1500, 0, 250, 80],
+        "action": "DoNothing",
+        "next": [
+            "记下进局时间"
+        ]
+    },
+    "吃鸡未知画面等待": {
+        "focus": { "Node.Recognition.Succeeded": "BJX 暂未确认主城、排队或局内，等待画面稳定" },
+        "recognition": "DirectHit",
+        "action": "DoNothing",
+        "post_delay": 1000,
+        "max_hit": 180,
+        "next": [
+            "吃鸡识别入口"
+        ]
+    },
+    "打开绝境": {
+        "focus": { "Node.Recognition.Succeeded": "BJX 打开绝境" },
+        "recognition": "DirectHit",
+        "action": "KeyDown",
+        "key": 162,
+        "auto_up": true,
+        "post_delay": 80,
+        "next": [
+            "绝境按L"
+        ]
+    },
+    "绝境按L": {
+        "recognition": "DirectHit",
+        "action": "ClickKey",
+        "key": 76,
+        "post_delay": 80,
+        "next": [
+            "松开Ctrl"
+        ]
+    },
+    "松开Ctrl": {
+        "recognition": "DirectHit",
+        "action": "KeyUp",
+        "key": 162,
+        "post_delay": 1000,
+        "timeout": 8000,
+        "next": [
+            "确认绝境已开"
+        ],
+        "on_error": [
+            "进场再开",
+            "留下截图"
+        ]
+    },
+    "进场再开": {
+        "recognition": "DirectHit",
+        "action": "Custom",
+        "custom_action": "BJX_ROYALE_CHECK_DEADLINE",
+        "custom_action_param": 1500,
+        "max_hit": 30,
+        "next": [
+            "打开绝境"
+        ]
+    },
+    "关掉再开": {
+        "recognition": "DirectHit",
+        "action": "Custom",
+        "custom_action": "BJX_ROYALE_CHECK_DEADLINE",
+        "max_hit": 30,
+        "next": [
+            "吃鸡重试关面板"
+        ]
+    },
+    "吃鸡重试关面板": {
+        "recognition": "DirectHit",
+        "action": "ClickKey",
+        "key": 27,
+        "post_delay": 800,
+        "next": [
+            "吃鸡检查重开"
+        ]
+    },
+    "吃鸡检查重开": {
+        "recognition": "DirectHit",
+        "action": "Custom",
+        "custom_action": "BJX_ROYALE_CHECK_DEADLINE",
+        "next": [
+            "打开绝境"
+        ]
+    },
+    "确认绝境已开": {
+        "focus": { "Node.Recognition.Succeeded": "BJX 看到绝境战场" },
+        "recognition": "And",
+        "all_of": [
+            {
+                "recognition": "OCR",
+                "expected": "绝境战场",
+                "roi": [0, 0, 720, 220]
+            },
+            {
+                "recognition": "Or",
+                "any_of": [
+                    {
+                        "recognition": "OCR",
+                        "expected": "五人模式",
+                        "roi": [0, 260, 280, 130]
+                    },
+                    {
+                        "recognition": "OCR",
+                        "expected": "单人模式",
+                        "roi": [0, 365, 280, 120]
+                    },
+                    {
+                        "recognition": "OCR",
+                        "expected": "龙门绝境",
+                        "roi": [1160, 640, 740, 320]
+                    }
+                ]
+            }
+        ],
+        "action": "DoNothing",
+        "timeout": 8000,
+        "rate_limit": 400,
+        "next": [
+            "确认单人页",
+            "点单人模式"
+        ],
+        "on_error": [
+            "关掉再开",
+            "留下截图"
+        ]
+    },
+    "点单人模式": {
+        "focus": { "Node.Recognition.Succeeded": "BJX 点击单人模式" },
+        "recognition": "OCR",
+        "expected": "单人模式",
+        "roi": [0, 365, 280, 120],
+        "rate_limit": 400,
+        "action": "Click",
+        "post_delay": 600,
+        "timeout": 6000,
+        "next": [
+            "确认单人页"
+        ],
+        "on_error": [
+            "关掉再开",
+            "留下截图"
+        ]
+    },
+    "确认单人页": {
+        "focus": { "Node.Recognition.Succeeded": "BJX 看到龙门绝境" },
+        "recognition": "OCR",
+        "expected": "龙门绝境",
+        "roi": [1160, 640, 740, 320],
+        "rate_limit": 400,
+        "action": "DoNothing",
+        "timeout": 8000,
+        "next": [
+            "读到零额度",
+            "记下飞沙令剩余"
+        ],
+        "on_error": [
+            "关掉再开",
+            "留下截图"
+        ]
+    },
+    "记下飞沙令剩余": {
+        "focus": { "Node.Recognition.Succeeded": "BJX 读到飞沙令剩余" },
+        "recognition": "OCR",
+        "expected": "^[1-9][0-9]{0,4}$",
+        "roi": [730, 978, 118, 50],
+        "order_by": "Expected",
+        "rate_limit": 300,
+        "action": "Command",
+        "exec": "{RESOURCE_DIR}/../tools/bjx-run.exe",
+        "args": [
+            "-NoProfile",
+            "-File",
+            "{RESOURCE_DIR}/../tools/record-royale-left.ps1",
+            "{LIBRARY_DIR}",
+            "{BOX}"
+        ],
+        "timeout": 8000,
+        "next": [
+            "读到零额度",
+            "本周仍有额度"
+        ],
+        "on_error": [
+            "读到零额度",
+            "本周仍有额度"
+        ]
+    },
+    "本周仍有额度": {
+        "focus": { "Node.Recognition.Succeeded": "BJX 飞沙令仍有剩余，继续个人匹配" },
+        "recognition": "OCR",
+        "expected": "^[1-9][0-9]{0,4}$",
+        "roi": [730, 978, 118, 50],
+        "order_by": "Expected",
+        "rate_limit": 300,
+        "action": "DoNothing",
+        "next": [
+            "点个人匹配"
+        ]
+    },
+    "点个人匹配": {
+        "recognition": "OCR",
+        "expected": "个人匹配",
+        "roi": [1335, 925, 530, 140],
+        "rate_limit": 400,
+        "action": "Custom",
+        "custom_action": "BJX_ROYALE_CHECK_DEADLINE",
+        "next": [
+            "提交个人匹配"
+        ],
+        "on_error": [
+            "留下截图"
+        ]
+    },
+    "提交个人匹配": {
+        "focus": { "Node.Action.Starting": "BJX 点击个人匹配" },
+        "recognition": "DirectHit",
+        "action": "Click",
+        "target": "点个人匹配",
+        "post_delay": 800,
+        "timeout": 8000,
+        "next": [
+            "匹配后等待排队"
+        ],
+        "on_error": [
+            "留下截图"
+        ]
+    },
+    "匹配后等待排队": {
+        "recognition": "DirectHit",
+        "action": "Custom",
+        "custom_action": "BJX_ROYALE_CHECK_DEADLINE",
+        "pre_delay": 0,
+        "post_delay": 0,
+        "next": [
+            "确认正在匹配",
+            "等待局内画面"
+        ],
+        "on_error": [
+            "留下截图"
+        ]
+    },
+    "回到局内看看": {
+        "recognition": "DirectHit",
+        "action": "DoNothing",
+        "post_delay": 800,
+        "max_hit": 4,
+        "timeout": 2000,
+        "next": [
+            "匹配后等待排队"
+        ],
+        "on_error": [
+            "留下截图"
+        ]
+    },
+    "确认正在匹配": {
+        "focus": { "Node.Recognition.Succeeded": "BJX 正在排队" },
+        "recognition": "Or",
+        "any_of": [
+            {
+                "recognition": "OCR",
+                "expected": "取消匹配",
+                "roi": [1335, 925, 530, 140]
+            },
+            {
+                "recognition": "OCR",
+                "expected": "预计排队",
+                "roi": [1370, 870, 500, 110]
+            }
+        ],
+        "action": "DoNothing",
+        "rate_limit": 400,
+        "next": [
+            "等进局"
+        ]
+    },
+    "等进局": {
+        "recognition": "DirectHit",
+        "action": "Custom",
+        "custom_action": "BJX_ROYALE_CHECK_DEADLINE",
+        "custom_action_param": 1000,
+        "timeout": 8000,
+        "next": [
+            "排队仍在",
+            "离队再看"
+        ],
+        "on_error": [
+            "等进局"
+        ]
+    },
+    "排队仍在": {
+        "recognition": "Or",
+        "any_of": [
+            {
+                "recognition": "OCR",
+                "expected": "取消匹配",
+                "roi": [1335, 925, 530, 140]
+            },
+            {
+                "recognition": "OCR",
+                "expected": "预计排队",
+                "roi": [1370, 870, 500, 110]
+            }
+        ],
+        "action": "DoNothing",
+        "rate_limit": 400,
+        "next": [
+            "等进局"
+        ]
+    },
+    "离队再看": {
+        "recognition": "DirectHit",
+        "action": "DoNothing",
+        "post_delay": 1500,
+        "timeout": 4000,
+        "next": [
+            "排队仍在",
+            "离队再看2"
+        ],
+        "on_error": [
+            "离队再看2"
+        ]
+    },
+    "离队再看2": {
+        "recognition": "DirectHit",
+        "action": "DoNothing",
+        "post_delay": 1500,
+        "timeout": 4000,
+        "next": [
+            "排队仍在",
+            "等待局内画面"
+        ],
+        "on_error": [
+            "等待局内画面"
+        ]
+    },
+    "等待局内画面": {
+        "recognition": "DirectHit",
+        "action": "DoNothing",
+        "pre_delay": 0,
+        "post_delay": 0,
+        "next": [
+            "看到结算",
+            "进局后确认战场"
+        ],
+        "on_error": [
+            "留下截图"
+        ]
+    },
+    "进局后确认战场": {
+        "recognition": "DirectHit",
+        "action": "DoNothing",
+        "pre_delay": 0,
+        "post_delay": 0,
+        "timeout": 3000,
+        "next": [
+            "确认已在局内",
+            "进局后等待画面"
+        ],
+        "on_error": [
+            "留下截图"
+        ]
+    },
+    "进局后等待画面": {
+        "focus": { "Node.Recognition.Succeeded": "BJX 已提交匹配，等待本局画面，未见退出页不再匹配" },
+        "recognition": "DirectHit",
+        "action": "DoNothing",
+        "post_delay": 1000,
+        "next": [
+            "匹配后等待排队"
+        ]
+    },
+    "局内看看": {
+        "recognition": "DirectHit",
+        "action": "Custom",
+        "custom_action": "BJX_ROYALE_CHECK_DEADLINE",
+        "timeout": 8000,
+        "next": [
+            "局内判断结算"
+        ],
+        "on_error": [
+            "留下截图"
+        ]
+    },
+    "局内判断结算": {
+        "recognition": "DirectHit",
+        "action": "DoNothing",
+        "pre_delay": 0,
+        "post_delay": 0,
+        "next": [
+            "看到结算",
+            "局内确认画面"
+        ]
+    },
+    "局内确认画面": {
+        "recognition": "DirectHit",
+        "action": "DoNothing",
+        "pre_delay": 0,
+        "post_delay": 0,
+        "timeout": 3000,
+        "next": [
+            "局内画面继续",
+            "本局等待画面"
+        ],
+        "on_error": [
+            "留下截图"
+        ]
+    },
+    "本局等待画面": {
+        "focus": { "Node.Recognition.Succeeded": "BJX 本局画面暂不明确，未见退出页，保持本局等待" },
+        "recognition": "DirectHit",
+        "action": "DoNothing",
+        "post_delay": 1000,
+        "next": [
+            "局内看看"
+        ]
+    },
+    "局内画面继续": {
+        "recognition": "OCR",
+        "expected": "剩余[:：]?\\s*[0-9]+",
+        "roi": [1500, 0, 250, 80],
+        "action": "Custom",
+        "custom_action": "BJX_ROYALE_CHECK_DEADLINE",
+        "next": [
+            "局内检查十分钟"
+        ]
+    },
+    "局内检查十分钟": {
+        "recognition": "DirectHit",
+        "action": "Command",
+        "exec": "{RESOURCE_DIR}/../tools/bjx-run.exe",
+        "args": [
+            "-NoProfile",
+            "-File",
+            "{RESOURCE_DIR}/../tools/royale-shift-c.ps1",
+            "check"
+        ],
+        "next": [
+            "局内检查按键截止"
+        ],
+        "on_error": [
+            "局内看看"
+        ]
+    },
+    "记下进局时间": {
+        "focus": { "Node.Recognition.Succeeded": "BJX 确认进局，十分钟后按一次 Shift+C" },
+        "recognition": "DirectHit",
+        "action": "Command",
+        "exec": "{RESOURCE_DIR}/../tools/bjx-run.exe",
+        "args": [
+            "-NoProfile",
+            "-File",
+            "{RESOURCE_DIR}/../tools/royale-shift-c.ps1",
+            "mark"
+        ],
+        "timeout": 8000,
+        "next": [
+            "局内看看"
+        ],
+        "on_error": [
+            "局内看看"
+        ]
+    },
+    "局内按1": {
+        "recognition": "DirectHit",
+        "action": "ClickKey",
+        "key": 49,
+        "pre_delay": 0,
+        "post_delay": 0,
+        "repeat": 1,
+        "timeout": 8000,
+        "next": [
+            "局内按键间隔"
+        ],
+        "on_error": [
+            "局内看看"
+        ]
+    },
+    "局内检查按键截止": {
+        "recognition": "DirectHit",
+        "action": "Custom",
+        "custom_action": "BJX_ROYALE_CHECK_DEADLINE",
+        "next": [
+            "局内按1"
+        ]
+    },
+    "局内按键间隔": {
+        "recognition": "DirectHit",
+        "action": "Custom",
+        "custom_action": "BJX_ROYALE_CHECK_DEADLINE",
+        "custom_action_param": 10000,
+        "next": [
+            "局内看看"
+        ]
+    },
+    "看到结算": {
+        "focus": { "Node.Recognition.Succeeded": "BJX 这一把结束，等加载" },
+        "recognition": "Or",
+        "any_of": [
+            {
+                "recognition": "OCR",
+                "expected": "下一步",
+                "roi": [1600, 950, 300, 120]
+            },
+            {
+                "recognition": "OCR",
+                "expected": "(传出|退出)战场",
+                "roi": [1200, 950, 700, 130]
+            }
+        ],
+        "action": "DoNothing",
+        "rate_limit": 400,
+        "next": [
+            "等加载"
+        ]
+    },
+    "等加载": {
+        "recognition": "DirectHit",
+        "action": "Custom",
+        "custom_action": "BJX_ROYALE_CHECK_DEADLINE",
+        "custom_action_param": 120000,
+        "timeout": 5000,
+        "next": [
+            "退出后确认主城"
+        ]
+    },
+    "退出后确认主城": {
+        "recognition": "DirectHit",
+        "action": "Custom",
+        "custom_action": "BJX_ROYALE_CHECK_DEADLINE",
+        "pre_delay": 0,
+        "post_delay": 0,
+        "next": [
+            "看到沧海集",
+            "退出后检查主界面"
+        ]
+    },
+    "退出后检查主界面": {
+        "recognition": "DirectHit",
+        "action": "DoNothing",
+        "pre_delay": 0,
+        "post_delay": 0,
+        "timeout": 3000,
+        "next": [
+            "退出后看到主界面",
+            "退出后等待主城"
+        ],
+        "on_error": [
+            "留下截图"
+        ]
+    },
+    "退出后看到主界面": {
+        "recognition": "Or",
+        "any_of": [
+            {
+                "recognition": "And",
+                "all_of": [
+                    { "recognition": "OCR", "expected": "花萼楼", "roi": [1250, 0, 150, 120] },
+                    { "recognition": "OCR", "expected": "行记", "roi": [1380, 0, 110, 120] }
+                ]
+            },
+            {
+                "recognition": "And",
+                "all_of": [
+                    { "recognition": "OCR", "expected": "花萼楼", "roi": [1300, 60, 100, 35] },
+                    { "recognition": "OCR", "expected": "行记", "roi": [1390, 60, 75, 35] }
+                ]
+            }
+        ],
+        "action": "DoNothing",
+        "next": [
+            "再来一局",
+            "通知完成"
+        ]
+    },
+    "退出后等待主城": {
+        "recognition": "DirectHit",
+        "action": "DoNothing",
+        "post_delay": 1000,
+        "next": [
+            "退出后确认主城"
+        ]
+    },
+    "看到沧海集": {
+        "focus": { "Node.Recognition.Succeeded": "BJX 已确认本局退出，返回沧海集" },
+        "recognition": "OCR",
+        "expected": "沧海集",
+        "roi": [1680, 140, 200, 70],
+        "rate_limit": 400,
+        "action": "DoNothing",
+        "next": [
+            "再来一局",
+            "通知完成"
+        ]
+    },
+    "再来一局": {
+        "focus": { "Node.Recognition.Succeeded": "BJX 再来一局" },
+        "recognition": "DirectHit",
+        "action": "Custom",
+        "custom_action": "BJX_ROYALE_CHECK_DEADLINE",
+        "next": [
+            "吃鸡检查窗口"
+        ]
+    },
+    "吃鸡到点结束": {
+        "focus": { "Node.Recognition.Succeeded": "BJX 到达吃鸡截止时间，结束刷币" },
+        "recognition": "DirectHit",
+        "action": "DoNothing",
+        "next": [
+            "通知完成"
+        ]
+    },
+    "读到零额度": {
+        "focus": { "Node.Recognition.Succeeded": "BJX 读到飞沙令剩余为 0，重新确认" },
+        "recognition": "OCR",
+        "expected": "^0$",
+        "roi": [730, 978, 118, 50],
+        "order_by": "Expected",
+        "rate_limit": 300,
+        "action": "DoNothing",
+        "post_delay": 400,
+        "timeout": 4000,
+        "next": [
+            "本周已满"
+        ],
+        "on_error": [
+            "关掉再开",
+            "留下截图"
+        ]
+    },
+    "本周已满": {
+        "focus": { "Node.Recognition.Succeeded": "BJX 已确认飞沙令剩余为 0，结束吃鸡" },
+        "recognition": "OCR",
+        "expected": "^0$",
+        "roi": [730, 978, 118, 50],
+        "order_by": "Expected",
+        "rate_limit": 300,
+        "action": "Command",
+        "exec": "{RESOURCE_DIR}/../tools/bjx-run.exe",
+        "args": [
+            "-NoProfile",
+            "-File",
+            "{RESOURCE_DIR}/../tools/record-royale-left.ps1",
+            "{LIBRARY_DIR}",
+            "{BOX}"
+        ],
+        "next": [
+            "关闭绝境"
+        ],
+        "on_error": [
+            "关闭绝境"
+        ]
+    },
+    "关闭绝境": {
+        "recognition": "DirectHit",
+        "action": "ClickKey",
+        "key": 27,
+        "post_delay": 400,
+        "next": [
+            "通知完成"
+        ]
+    },
+    "吃鸡回城": {
+        "focus": { "Node.Recognition.Succeeded": "BJX 看到回城复活" },
+        "recognition": "OCR",
+        "expected": "回城复活",
+        "action": "Click",
+        "timeout": 600,
+        "max_hit": 2,
+        "post_delay": 1000,
+        "next": [
+            "吃鸡检查窗口"
+        ]
+    }
+}

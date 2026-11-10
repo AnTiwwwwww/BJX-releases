@@ -1,0 +1,875 @@
+{
+    "大侠之路": {
+        "recognition": "DirectHit",
+        "action": "Command",
+        "exec": "{RESOURCE_DIR}/../tools/bjx-run.exe",
+        "args": [
+            "-NoProfile",
+            "-File",
+            "{RESOURCE_DIR}/../tools/remind-resolution.ps1",
+            "{ENTRY}"
+        ],
+        "timeout": 8000,
+        "on_error": [
+            "失败后回初始页"
+        ],
+        "next": [
+            "遇到登录验证",
+            "点已知关闭",
+            "大侠回城",
+            "打开大侠之路"
+        ]
+    },
+    "打开大侠之路": {
+        "recognition": "OCR",
+        "expected": [
+            "必做",
+            "侠"
+        ],
+        "roi": [1210, 0, 98, 120],
+        "action": "Click",
+        "timeout": 8000,
+        "post_delay": 800,
+        "rate_limit": 400,
+        "next": [
+            "确认大侠之路已开"
+        ],
+        "on_error": [
+            "大侠没条目"
+        ]
+    },
+    "确认大侠之路已开": {
+        "recognition": "OCR",
+        "expected": "大侠之路",
+        "roi": [0, 0, 1920, 400],
+        "action": "DoNothing",
+        "timeout": 8000,
+        "rate_limit": 400,
+        "next": [
+            "扫描大侠之路"
+        ],
+        "on_error": [
+            "失败后回初始页"
+        ]
+    },
+    "大侠回退": {
+        "recognition": "DirectHit",
+        "action": "ClickKey",
+        "key": 27,
+        "max_hit": 1,
+        "post_delay": 500,
+        "next": [
+            "打开大侠之路"
+        ]
+    },
+    "扫描大侠之路": {
+        "recognition": "DirectHit",
+        "action": "DoNothing",
+        "timeout": 8000,
+        "on_error": [
+            "大侠没条目"
+        ],
+        "next": [
+            "大侠回城",
+            "关掉江湖秘宝",
+            "领每日百活跃",
+            "打开每周奖励",
+            "设计站返回",
+            "外观商城关闭",
+            "跳过已完成战争沙盘",
+            "做战争沙盘",
+            "跳过已完成商城外观",
+            "做商城外观",
+            "跳过已完成奇遇手册",
+            "做奇遇手册",
+            "跳过已完成在线",
+            "做在线一分钟",
+            "跳过已完成召唤宠物",
+            "做召唤宠物",
+            "跳过已完成茶饼品茗",
+            "做领取茶饼",
+            "跳过已完成名片点赞",
+            "做名片点赞",
+            "跳过已完成江湖笔记",
+            "做江湖笔记",
+            "刷新条目"
+        ]
+    },
+    "做战争沙盘": {
+        "enabled": false,
+        "recognition": "OCR",
+        "expected": [
+            "查看沙盘界面",
+            "战争沙盘"
+        ],
+        "roi": [330, 720, 1580, 170],
+        "action": "Click",
+        "timeout": 4000,
+        "post_delay": 800,
+        "next": [
+            "沙盘能否查看"
+        ],
+        "on_error": [
+            "关掉打开即完成"
+        ]
+    },
+    "沙盘能否查看": {
+        "recognition": "OCR",
+        "expected": [
+            "未加入阵营",
+            "无法查看",
+            "加入阵营"
+        ],
+        "timeout": 2000,
+        "action": "DoNothing",
+        "next": [
+            "关掉沙盘并刷新"
+        ],
+        "on_error": [
+            "关掉打开即完成"
+        ]
+    },
+    "做商城外观": {
+        "enabled": false,
+        "recognition": "OCR",
+        "expected": [
+            "浏览设计站",
+            "商城外观",
+            "浏览商城"
+        ],
+        "roi": [330, 720, 1580, 170],
+        "action": "Click",
+        "timeout": 8000,
+        "post_delay": 1200,
+        "next": [
+            "设计站返回",
+            "外观商城关闭"
+        ],
+        "on_error": [
+            "扫描大侠之路"
+        ]
+    },
+    "做奇遇手册": {
+        "enabled": false,
+        "recognition": "OCR",
+        "expected": "奇遇手册",
+        "roi": [330, 720, 1580, 170],
+        "action": "Click",
+        "timeout": 1500,
+        "post_delay": 800,
+        "next": [
+            "关掉打开即完成"
+        ],
+        "on_error": [
+            "失败后回初始页"
+        ]
+    },
+    "做家园许愿": {
+        "enabled": false,
+        "recognition": "OCR",
+        "expected": [
+            "家园许愿",
+            "许愿"
+        ],
+        "roi": [330, 720, 1580, 170],
+        "action": "Click",
+        "timeout": 4000,
+        "post_delay": 800,
+        "next": [
+            "许愿是否要钱"
+        ],
+        "on_error": [
+            "尝试免费许愿"
+        ]
+    },
+    "许愿是否要钱": {
+        "recognition": "OCR",
+        "expected": [
+            "园宅币",
+            "金币"
+        ],
+        "timeout": 2000,
+        "action": "DoNothing",
+        "next": [
+            "关掉界面并刷新"
+        ],
+        "on_error": [
+            "点一次免费许愿"
+        ]
+    },
+    "尝试免费许愿": {
+        "recognition": "DirectHit",
+        "action": "DoNothing",
+        "timeout": 2000,
+        "next": [
+            "点一次免费许愿"
+        ],
+        "on_error": [
+            "失败后回初始页"
+        ]
+    },
+    "点一次免费许愿": {
+        "recognition": "OCR",
+        "expected": "许愿",
+        "action": "Click",
+        "timeout": 2000,
+        "post_delay": 500,
+        "next": [
+            "关掉打开即完成"
+        ],
+        "on_error": [
+            "失败后回初始页"
+        ]
+    },
+    "做在线一分钟": {
+        "enabled": false,
+        "recognition": "OCR",
+        "expected": "在线一分钟",
+        "roi": [330, 720, 1580, 170],
+        "action": "Click",
+        "timeout": 1500,
+        "post_delay": 65000,
+        "next": [
+            "关掉打开即完成"
+        ],
+        "on_error": [
+            "失败后回初始页"
+        ]
+    },
+    "做召唤宠物": {
+        "enabled": false,
+        "recognition": "OCR",
+        "expected": "召唤宠物",
+        "roi": [330, 720, 1580, 170],
+        "action": "Click",
+        "timeout": 4000,
+        "post_delay": 800,
+        "next": [
+            "有没有宠物"
+        ],
+        "on_error": [
+            "尝试召唤"
+        ]
+    },
+    "有没有宠物": {
+        "recognition": "OCR",
+        "expected": [
+            "没有宠物",
+            "暂无宠物"
+        ],
+        "timeout": 2000,
+        "action": "DoNothing",
+        "next": [
+            "关掉界面并刷新"
+        ],
+        "on_error": [
+            "点召唤"
+        ]
+    },
+    "尝试召唤": {
+        "recognition": "DirectHit",
+        "action": "DoNothing",
+        "timeout": 2000,
+        "next": [
+            "点召唤"
+        ],
+        "on_error": [
+            "失败后回初始页"
+        ]
+    },
+    "点召唤": {
+        "recognition": "OCR",
+        "expected": [
+            "召唤",
+            "出战"
+        ],
+        "action": "Click",
+        "timeout": 2000,
+        "post_delay": 500,
+        "next": [
+            "关掉打开即完成"
+        ],
+        "on_error": [
+            "失败后回初始页"
+        ]
+    },
+    "关掉打开即完成": {
+        "recognition": "DirectHit",
+        "action": "ClickKey",
+        "key": 27,
+        "post_delay": 500,
+        "next": [
+            "扫描大侠之路"
+        ]
+    },
+    "关掉界面并刷新": {
+        "recognition": "DirectHit",
+        "action": "ClickKey",
+        "key": 27,
+        "post_delay": 500,
+        "next": [
+            "刷新条目"
+        ]
+    },
+    "跳过已完成战争沙盘": {
+        "recognition": "And",
+        "all_of": [
+            {
+                "sub_name": "条目名",
+                "recognition": "OCR",
+                "expected": [
+            "查看沙盘界面",
+            "战争沙盘"
+        ],
+                "roi": [330, 720, 1580, 170]
+            },
+            {
+                "recognition": "OCR",
+                "expected": "已完成",
+                "roi": "条目名",
+                "roi_offset": [-50, -220, 100, 200]
+            }
+        ],
+        "action": "DoNothing",
+        "timeout": 1500,
+        "next": [
+            "跳过已完成商城外观",
+            "做商城外观",
+            "跳过已完成奇遇手册",
+            "做奇遇手册",
+            "跳过已完成在线",
+            "做在线一分钟",
+            "跳过已完成召唤宠物",
+            "做召唤宠物",
+            "跳过已完成茶饼品茗",
+            "做领取茶饼",
+            "跳过已完成名片点赞",
+            "做名片点赞",
+            "跳过已完成江湖笔记",
+            "做江湖笔记",
+            "刷新条目"
+        ],
+        "on_error": [
+            "大侠之路完成"
+        ]
+    },
+    "跳过已完成商城外观": {
+        "recognition": "And",
+        "all_of": [
+            {
+                "sub_name": "条目名",
+                "recognition": "OCR",
+                "expected": [
+                    "浏览设计站",
+                    "商城外观",
+                    "浏览商城"
+                ],
+                "roi": [330, 720, 1580, 170]
+            },
+            {
+                "recognition": "OCR",
+                "expected": "已完成",
+                "roi": "条目名",
+                "roi_offset": [-50, -220, 100, 200]
+            }
+        ],
+        "action": "DoNothing",
+        "timeout": 1500,
+        "next": [
+            "跳过已完成奇遇手册",
+            "做奇遇手册",
+            "跳过已完成在线",
+            "做在线一分钟",
+            "跳过已完成召唤宠物",
+            "做召唤宠物",
+            "跳过已完成茶饼品茗",
+            "做领取茶饼",
+            "跳过已完成名片点赞",
+            "做名片点赞",
+            "跳过已完成江湖笔记",
+            "做江湖笔记",
+            "刷新条目"
+        ],
+        "on_error": [
+            "大侠之路完成"
+        ]
+    },
+    "跳过已完成奇遇手册": {
+        "recognition": "And",
+        "all_of": [
+            {
+                "sub_name": "条目名",
+                "recognition": "OCR",
+                "expected": "奇遇手册",
+                "roi": [330, 720, 1580, 170]
+            },
+            {
+                "recognition": "OCR",
+                "expected": "已完成",
+                "roi": "条目名",
+                "roi_offset": [-50, -220, 100, 200]
+            }
+        ],
+        "action": "DoNothing",
+        "timeout": 1500,
+        "next": [
+            "跳过已完成在线",
+            "做在线一分钟",
+            "跳过已完成召唤宠物",
+            "做召唤宠物",
+            "跳过已完成茶饼品茗",
+            "做领取茶饼",
+            "跳过已完成名片点赞",
+            "做名片点赞",
+            "跳过已完成江湖笔记",
+            "做江湖笔记",
+            "刷新条目"
+        ],
+        "on_error": [
+            "大侠之路完成"
+        ]
+    },
+    "跳过已完成家园许愿": {
+        "recognition": "And",
+        "all_of": [
+            {
+                "sub_name": "条目名",
+                "recognition": "OCR",
+                "expected": [
+                    "家园许愿",
+                    "许愿"
+                ],
+                "roi": [330, 720, 1580, 170]
+            },
+            {
+                "recognition": "OCR",
+                "expected": "已完成",
+                "roi": "条目名",
+                "roi_offset": [-50, -220, 100, 200]
+            }
+        ],
+        "action": "DoNothing",
+        "timeout": 1500,
+        "next": [
+            "跳过已完成在线",
+            "做在线一分钟",
+            "跳过已完成召唤宠物",
+            "做召唤宠物",
+            "跳过已完成茶饼品茗",
+            "做领取茶饼",
+            "跳过已完成名片点赞",
+            "做名片点赞",
+            "跳过已完成江湖笔记",
+            "做江湖笔记",
+            "刷新条目"
+        ],
+        "on_error": [
+            "大侠之路完成"
+        ]
+    },
+    "跳过已完成在线": {
+        "recognition": "And",
+        "all_of": [
+            {
+                "sub_name": "条目名",
+                "recognition": "OCR",
+                "expected": "在线一分钟",
+                "roi": [330, 720, 1580, 170]
+            },
+            {
+                "recognition": "OCR",
+                "expected": "已完成",
+                "roi": "条目名",
+                "roi_offset": [-50, -220, 100, 200]
+            }
+        ],
+        "action": "DoNothing",
+        "timeout": 1500,
+        "next": [
+            "跳过已完成召唤宠物",
+            "做召唤宠物",
+            "跳过已完成茶饼品茗",
+            "做领取茶饼",
+            "跳过已完成名片点赞",
+            "做名片点赞",
+            "跳过已完成江湖笔记",
+            "做江湖笔记",
+            "刷新条目"
+        ],
+        "on_error": [
+            "大侠之路完成"
+        ]
+    },
+    "跳过已完成召唤宠物": {
+        "recognition": "And",
+        "all_of": [
+            {
+                "sub_name": "条目名",
+                "recognition": "OCR",
+                "expected": "召唤宠物",
+                "roi": [330, 720, 1580, 170]
+            },
+            {
+                "recognition": "OCR",
+                "expected": "已完成",
+                "roi": "条目名",
+                "roi_offset": [-50, -220, 100, 200]
+            }
+        ],
+        "action": "DoNothing",
+        "timeout": 1500,
+        "next": [
+            "跳过已完成茶饼品茗",
+            "做领取茶饼",
+            "跳过已完成名片点赞",
+            "做名片点赞",
+            "跳过已完成江湖笔记",
+            "做江湖笔记",
+            "刷新条目"
+        ],
+        "on_error": [
+            "大侠之路完成"
+        ]
+    },
+    "跳过已完成江湖笔记": {
+        "recognition": "And",
+        "all_of": [
+            {
+                "sub_name": "条目名",
+                "recognition": "OCR",
+                "expected": "江湖笔记",
+                "roi": [330, 720, 1580, 170]
+            },
+            {
+                "recognition": "OCR",
+                "expected": "已完成",
+                "roi": "条目名",
+                "roi_offset": [-50, -220, 100, 200]
+            }
+        ],
+        "action": "DoNothing",
+        "timeout": 1500,
+        "next": [
+            "刷新条目"
+        ],
+        "on_error": [
+            "大侠之路完成"
+        ]
+    },
+    "做江湖笔记": {
+        "enabled": false,
+        "recognition": "OCR",
+        "expected": "江湖笔记",
+        "roi": [330, 720, 1580, 170],
+        "action": "Click",
+        "timeout": 1500,
+        "post_delay": 800,
+        "next": [
+            "关掉打开即完成"
+        ],
+        "on_error": [
+            "失败后回初始页"
+        ]
+    },
+    "关掉江湖秘宝": {
+        "recognition": "OCR",
+        "expected": [
+            "江湖秘宝",
+            "额外获得",
+            "商城积分奖励"
+        ],
+        "action": "Click",
+        "target": [900, 180, 80, 40],
+        "max_hit": 3,
+        "post_delay": 400,
+        "timeout": 1500,
+        "next": [
+            "扫描大侠之路"
+        ],
+        "on_error": [
+            "扫描大侠之路"
+        ]
+    },
+    "领每日百活跃": {
+        "recognition": "OCR",
+        "expected": "100",
+        "roi": [1388, 880, 190, 180],
+        "action": "Click",
+        "target": [1404, 885, 140, 120],
+        "max_hit": 1,
+        "post_delay": 800,
+        "timeout": 2000,
+        "next": [
+            "关掉江湖秘宝"
+        ],
+        "on_error": [
+            "扫描大侠之路"
+        ]
+    },
+    "打开每周奖励": {
+        "recognition": "OCR",
+        "expected": "每周",
+        "roi": [1540, 860, 250, 200],
+        "action": "Click",
+        "target": [1601, 911, 119, 110],
+        "max_hit": 1,
+        "post_delay": 1000,
+        "timeout": 2500,
+        "next": [
+            "领每周宝箱"
+        ],
+        "on_error": [
+            "扫描大侠之路"
+        ]
+    },
+    "领每周宝箱": {
+        "recognition": "DirectHit",
+        "action": "Click",
+        "target": [1076, 910, 70, 80],
+        "post_delay": 350,
+        "next": [
+            "领每周宝箱2"
+        ]
+    },
+    "领每周宝箱2": {
+        "recognition": "DirectHit",
+        "action": "Click",
+        "target": [1210, 910, 70, 80],
+        "post_delay": 350,
+        "next": [
+            "领每周宝箱3"
+        ]
+    },
+    "领每周宝箱3": {
+        "recognition": "DirectHit",
+        "action": "Click",
+        "target": [1345, 910, 70, 80],
+        "post_delay": 350,
+        "next": [
+            "领每周宝箱4"
+        ]
+    },
+    "领每周宝箱4": {
+        "recognition": "DirectHit",
+        "action": "Click",
+        "target": [1479, 910, 70, 80],
+        "post_delay": 350,
+        "next": [
+            "领每周宝箱5"
+        ]
+    },
+    "领每周宝箱5": {
+        "recognition": "DirectHit",
+        "action": "Click",
+        "target": [1613, 910, 70, 80],
+        "post_delay": 500,
+        "next": [
+            "扫描大侠之路"
+        ]
+    },
+    "设计站返回": {
+        "recognition": "OCR",
+        "expected": "设计站",
+        "roi": [0, 0, 520, 160],
+        "action": "Click",
+        "target": [1809, 12, 78, 72],
+        "post_delay": 800,
+        "timeout": 4000,
+        "next": [
+            "外观商城关闭"
+        ],
+        "on_error": [
+            "扫描大侠之路"
+        ]
+    },
+    "外观商城关闭": {
+        "recognition": "OCR",
+        "expected": "外观商城",
+        "roi": [0, 0, 560, 160],
+        "action": "Click",
+        "target": [1798, 12, 99, 71],
+        "post_delay": 800,
+        "timeout": 5000,
+        "next": [
+            "扫描大侠之路"
+        ],
+        "on_error": [
+            "失败后回初始页"
+        ]
+    },
+    "关掉沙盘并刷新": {
+        "recognition": "DirectHit",
+        "action": "ClickKey",
+        "key": 27,
+        "post_delay": 500,
+        "next": [
+            "刷新沙盘卡片"
+        ]
+    },
+    "刷新沙盘卡片": {
+        "recognition": "OCR",
+        "expected": [
+            "查看沙盘界面",
+            "战争沙盘"
+        ],
+        "roi": [330, 720, 1580, 190],
+        "action": "Click",
+        "target": true,
+        "target_offset": [110, -490, -20, 60],
+        "post_delay": 700,
+        "timeout": 3000,
+        "next": [
+            "扫描大侠之路"
+        ],
+        "on_error": [
+            "刷新条目"
+        ]
+    },
+    "跳过已完成茶饼品茗": {
+        "recognition": "And",
+        "all_of": [
+            {
+                "sub_name": "条目名",
+                "recognition": "OCR",
+                "expected": "茶饼或品茗",
+                "roi": [330, 720, 1580, 170]
+            },
+            {
+                "recognition": "OCR",
+                "expected": "已完成",
+                "roi": "条目名",
+                "roi_offset": [-50, -220, 100, 200]
+            }
+        ],
+        "action": "DoNothing",
+        "timeout": 1500,
+        "next": [
+            "跳过已完成名片点赞",
+            "做名片点赞",
+            "跳过已完成江湖笔记",
+            "做江湖笔记",
+            "刷新条目"
+        ],
+        "on_error": [
+            "大侠之路完成"
+        ]
+    },
+    "做领取茶饼": {
+        "enabled": false,
+        "recognition": "OCR",
+        "expected": "茶饼或品茗",
+        "roi": [330, 720, 1580, 170],
+        "action": "Click",
+        "timeout": 1500,
+        "post_delay": 800,
+        "next": [
+            "关掉打开即完成"
+        ],
+        "on_error": [
+            "失败后回初始页"
+        ]
+    },
+    "跳过已完成名片点赞": {
+        "recognition": "And",
+        "all_of": [
+            {
+                "sub_name": "条目名",
+                "recognition": "OCR",
+                "expected": "名片点赞",
+                "roi": [330, 720, 1580, 170]
+            },
+            {
+                "recognition": "OCR",
+                "expected": "已完成",
+                "roi": "条目名",
+                "roi_offset": [-50, -220, 100, 200]
+            }
+        ],
+        "action": "DoNothing",
+        "timeout": 1500,
+        "next": [
+            "跳过已完成江湖笔记",
+            "做江湖笔记",
+            "刷新条目"
+        ],
+        "on_error": [
+            "大侠之路完成"
+        ]
+    },
+    "做名片点赞": {
+        "enabled": false,
+        "recognition": "OCR",
+        "expected": "名片点赞",
+        "roi": [330, 720, 1580, 170],
+        "action": "Click",
+        "timeout": 1500,
+        "post_delay": 800,
+        "next": [
+            "关掉打开即完成"
+        ],
+        "on_error": [
+            "失败后回初始页"
+        ]
+    },
+    "刷新条目": {
+        "recognition": "OCR",
+        "expected": [
+            "许愿树许愿",
+            "许愿树",
+            "名望事件",
+            "好友装备",
+            "名剑大会",
+            "偷花"
+        ],
+        "roi": [330, 720, 1580, 190],
+        "action": "Click",
+        "target": true,
+        "target_offset": [110, -490, -20, 60],
+        "post_delay": 700,
+        "timeout": 3000,
+        "max_hit": 12,
+        "next": [
+            "扫描大侠之路"
+        ],
+        "on_error": [
+            "大侠之路完成"
+        ]
+    },
+    "大侠没条目": {
+        "recognition": "DirectHit",
+        "action": "Screencap",
+        "filename": "hero-miss",
+        "next": [
+            "关掉大侠并跳过"
+        ]
+    },
+    "关掉大侠并跳过": {
+        "recognition": "DirectHit",
+        "action": "ClickKey",
+        "key": 27,
+        "post_delay": 400,
+        "next": [
+            "跳过并回初始页"
+        ]
+    },
+    "大侠之路完成": {
+        "recognition": "DirectHit",
+        "action": "ClickKey",
+        "key": 27,
+        "post_delay": 500,
+        "next": [
+            "回到初始页"
+        ]
+    },
+    "大侠回城": {
+        "recognition": "OCR",
+        "expected": "回城复活",
+        "action": "Click",
+        "timeout": 600,
+        "max_hit": 2,
+        "post_delay": 1000,
+        "next": [
+            "大侠之路"
+        ]
+    }
+}

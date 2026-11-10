@@ -1,0 +1,14 @@
+{
+  "review_type": "image-inspection",
+  "status": "pass",
+  "artifact_sha256": "33c2fadf2881359b572e034200b3336896a51edf6285472012104205d43208cb",
+  "inspected_screenshots": [
+    "bjx-royale-route.visual-check.2048x1320.light.png",
+    "bjx-royale-route.visual-check.1440x900.dark.png"
+  ],
+  "observations": [
+    "新增 PowerShell 环境检查及缺失时停止启动的分支清晰，明暗主题无节点或箭头重叠。",
+    "主流程、退出后重排、零额度与次日截止条件完整显示；图下方补充卡片由页面滚动查看，本次目视检查覆盖截图内流程。"
+  ],
+  "correction_rounds": 1
+}

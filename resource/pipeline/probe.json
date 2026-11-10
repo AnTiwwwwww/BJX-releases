@@ -1,0 +1,7 @@
+{
+    "探测游戏窗口": {
+        "recognition": "DirectHit",
+        "action": "Screencap",
+        "filename": "probe"
+    }
+}

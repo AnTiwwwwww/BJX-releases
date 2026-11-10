@@ -1,0 +1,32 @@
+{
+    "运行结束后操作": {
+        "recognition": "DirectHit",
+        "action": "Command",
+        "exec": "{RESOURCE_DIR}/../tools/bjx-run.exe",
+        "args": [
+            "-NoProfile",
+            "-File",
+            "{RESOURCE_DIR}/../tools/after-run.ps1",
+            "none"
+        ],
+        "timeout": 10000,
+        "next": [
+            "结束后关闭BJX",
+            "结束后操作返回"
+        ]
+    },
+    "结束后关闭BJX": {
+        "enabled": false,
+        "recognition": "DirectHit",
+        "action": "Custom",
+        "custom_action": "MXU_KILLPROC_ACTION",
+        "custom_action_param": {
+            "kill_self": true
+        },
+        "target": [0, 0, 1, 1]
+    },
+    "结束后操作返回": {
+        "recognition": "DirectHit",
+        "action": "DoNothing"
+    }
+}

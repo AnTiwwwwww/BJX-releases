@@ -1,0 +1,305 @@
+{
+    "切换账号": {
+        "recognition": "DirectHit",
+        "action": "Command",
+        "exec": "{RESOURCE_DIR}/../tools/bjx-run.exe",
+        "args": [
+            "-NoProfile",
+            "-File",
+            "{RESOURCE_DIR}/../tools/remind-resolution.ps1",
+            "{ENTRY}"
+        ],
+        "next": [
+            "遇到登录验证",
+            "点已知关闭",
+            "账号回城",
+            "账号打开菜单"
+        ]
+    },
+    "账号打开菜单": {
+        "recognition": "OCR",
+        "expected": "菜单",
+        "action": "Click",
+        "timeout": 4000,
+        "post_delay": 600,
+        "next": [
+            "遇到登录验证",
+            "点切换账号"
+        ],
+        "on_error": [
+            "账号按菜单键"
+        ]
+    },
+    "账号按菜单键": {
+        "recognition": "DirectHit",
+        "action": "ClickKey",
+        "key": 27,
+        "max_hit": 1,
+        "timeout": 4000,
+        "post_delay": 600,
+        "next": [
+            "点切换账号"
+        ],
+        "on_error": [
+            "留下截图"
+        ]
+    },
+    "点切换账号": {
+        "recognition": "OCR",
+        "expected": "切换账号",
+        "action": "Click",
+        "timeout": 4000,
+        "post_delay": 800,
+        "next": [
+            "遇到登录验证",
+            "确认切换账号",
+            "点选账号名"
+        ],
+        "on_error": [
+            "账号打开设置"
+        ]
+    },
+    "账号打开设置": {
+        "recognition": "OCR",
+        "expected": "设置",
+        "action": "Click",
+        "timeout": 3000,
+        "max_hit": 1,
+        "post_delay": 600,
+        "next": [
+            "点切换账号"
+        ],
+        "on_error": [
+            "留下截图"
+        ]
+    },
+    "确认切换账号": {
+        "recognition": "OCR",
+        "expected": [
+            "确定",
+            "确认"
+        ],
+        "action": "Click",
+        "timeout": 1200,
+        "post_delay": 800,
+        "next": [
+            "遇到登录验证",
+            "点选账号名"
+        ]
+    },
+    "点选账号名": {
+        "recognition": "OCR",
+        "expected": "待填账号名",
+        "action": "Click",
+        "timeout": 8000,
+        "post_delay": 800,
+        "next": [
+            "遇到登录验证",
+            "账号已到选人",
+            "看到选服"
+        ],
+        "on_error": [
+            "留下截图"
+        ]
+    },
+    "看到选服": {
+        "recognition": "OCR",
+        "expected": "选择服务器",
+        "action": "DoNothing",
+        "timeout": 1500,
+        "next": [
+            "登录验证截图"
+        ]
+    },
+    "账号已到选人": {
+        "recognition": "OCR",
+        "expected": [
+            "进入游戏",
+            "进入江湖"
+        ],
+        "action": "DoNothing",
+        "timeout": 20000,
+        "next": [
+            "通知完成"
+        ]
+    },
+    "账号回城": {
+        "recognition": "OCR",
+        "expected": "回城复活",
+        "action": "Click",
+        "timeout": 600,
+        "max_hit": 2,
+        "post_delay": 1000,
+        "next": [
+            "切换账号"
+        ]
+    },
+    "切换角色": {
+        "recognition": "DirectHit",
+        "action": "Command",
+        "exec": "{RESOURCE_DIR}/../tools/bjx-run.exe",
+        "args": [
+            "-NoProfile",
+            "-File",
+            "{RESOURCE_DIR}/../tools/remind-resolution.ps1",
+            "{ENTRY}"
+        ],
+        "next": [
+            "遇到登录验证",
+            "点已知关闭",
+            "角色回城",
+            "已在选人界面",
+            "角色打开菜单"
+        ]
+    },
+    "已在选人界面": {
+        "recognition": "OCR",
+        "expected": [
+            "进入游戏",
+            "进入江湖"
+        ],
+        "action": "DoNothing",
+        "timeout": 1500,
+        "next": [
+            "遇到登录验证",
+            "点选角色名"
+        ]
+    },
+    "角色打开菜单": {
+        "recognition": "OCR",
+        "expected": "菜单",
+        "action": "Click",
+        "timeout": 4000,
+        "post_delay": 600,
+        "next": [
+            "遇到登录验证",
+            "点切换角色"
+        ],
+        "on_error": [
+            "角色按菜单键"
+        ]
+    },
+    "角色按菜单键": {
+        "recognition": "DirectHit",
+        "action": "ClickKey",
+        "key": 27,
+        "max_hit": 1,
+        "timeout": 4000,
+        "post_delay": 600,
+        "next": [
+            "点切换角色"
+        ],
+        "on_error": [
+            "留下截图"
+        ]
+    },
+    "点切换角色": {
+        "recognition": "OCR",
+        "expected": "切换角色",
+        "action": "Click",
+        "timeout": 4000,
+        "post_delay": 800,
+        "next": [
+            "遇到登录验证",
+            "确认切换角色",
+            "点选角色名"
+        ],
+        "on_error": [
+            "角色打开设置"
+        ]
+    },
+    "角色打开设置": {
+        "recognition": "OCR",
+        "expected": "设置",
+        "action": "Click",
+        "timeout": 3000,
+        "max_hit": 1,
+        "post_delay": 600,
+        "next": [
+            "点切换角色"
+        ],
+        "on_error": [
+            "留下截图"
+        ]
+    },
+    "确认切换角色": {
+        "recognition": "OCR",
+        "expected": [
+            "确定",
+            "确认"
+        ],
+        "action": "Click",
+        "timeout": 1200,
+        "post_delay": 800,
+        "next": [
+            "遇到登录验证",
+            "点选角色名"
+        ]
+    },
+    "点选角色名": {
+        "recognition": "OCR",
+        "expected": "待填角色名",
+        "action": "Click",
+        "timeout": 8000,
+        "post_delay": 800,
+        "next": [
+            "遇到登录验证",
+            "点进入游戏"
+        ],
+        "on_error": [
+            "留下截图"
+        ]
+    },
+    "点进入游戏": {
+        "recognition": "OCR",
+        "expected": [
+            "进入游戏",
+            "进入江湖"
+        ],
+        "action": "Click",
+        "timeout": 8000,
+        "post_delay": 800,
+        "next": [
+            "等到主界面"
+        ],
+        "on_error": [
+            "留下截图"
+        ]
+    },
+    "等到主界面": {
+        "recognition": "OCR",
+        "expected": [
+            "大侠之路",
+            "请输入密码",
+            "登录验证",
+            "安全验证"
+        ],
+        "action": "DoNothing",
+        "timeout": 120000,
+        "next": [
+            "遇到登录验证",
+            "切换角色完成"
+        ],
+        "on_error": [
+            "留下截图"
+        ]
+    },
+    "切换角色完成": {
+        "recognition": "DirectHit",
+        "action": "DoNothing",
+        "next": [
+            "通知完成"
+        ]
+    },
+    "角色回城": {
+        "recognition": "OCR",
+        "expected": "回城复活",
+        "action": "Click",
+        "timeout": 600,
+        "max_hit": 2,
+        "post_delay": 1000,
+        "next": [
+            "切换角色"
+        ]
+    }
+}

@@ -1,0 +1,24 @@
+{
+    "定时开始": {
+        "focus": { "Node.Action.Starting": "BJX 正在等待设定的开始时间，可随时停止取消" },
+        "recognition": "DirectHit",
+        "action": "Custom",
+        "custom_action": "MXU_WAITUNTIL_ACTION",
+        "custom_action_param": {
+            "target_time": "14:00"
+        },
+        "target": [0, 0, 1, 1],
+        "on_error": [
+            "定时开始未成功"
+        ]
+    },
+    "定时开始未成功": {
+        "focus": { "Node.Recognition.Succeeded": "BJX 定时等待未成功，请停止后检查开始时间及 MXU 客户端" },
+        "recognition": "DirectHit",
+        "action": "DoNothing",
+        "post_delay": 5000,
+        "next": [
+            "定时开始未成功"
+        ]
+    }
+}

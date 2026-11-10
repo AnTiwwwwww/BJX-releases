@@ -1,0 +1,42 @@
+{
+  "schema_version": 1,
+  "platform": "windows-x86_64",
+  "ocr_revision": "dabcd4681ac990dc4361de26416d986abd80e4aa",
+  "assets": [
+    {
+      "name": "MaaFramework",
+      "version": "5.14.3",
+      "file": "MAA-win-x86_64-v5.14.3.zip",
+      "url": "https://github.com/MaaXYZ/MaaFramework/releases/download/v5.14.3/MAA-win-x86_64-v5.14.3.zip",
+      "sha256": "4042fde31c583cc5125ec5b12257f8d1929672bb5cb64c9052c34fc8ff4bb8ff"
+    },
+    {
+      "name": "MXU",
+      "version": "2.8.0",
+      "file": "MXU-win-x86_64-v2.8.0.zip",
+      "url": "https://github.com/MaaXYZ/MXU/releases/download/v2.8.0/MXU-win-x86_64-v2.8.0.zip",
+      "sha256": "437019b8e93e22b0a6cbb6779c3b1e56cb9c33b3f60af69e04e4c15d5f62c8c4"
+    },
+    {
+      "name": "OCR-det",
+      "version": "ppocr_v4/zh_cn",
+      "file": "det.onnx",
+      "url": "https://raw.githubusercontent.com/MaaXYZ/MaaCommonAssets/dabcd4681ac990dc4361de26416d986abd80e4aa/OCR/ppocr_v4/zh_cn/det.onnx",
+      "sha256": "767e663dded50813dca0abc9a49859e345e0f74a48b387661188f096a9211d74"
+    },
+    {
+      "name": "OCR-rec",
+      "version": "ppocr_v4/zh_cn",
+      "file": "rec.onnx",
+      "url": "https://raw.githubusercontent.com/MaaXYZ/MaaCommonAssets/dabcd4681ac990dc4361de26416d986abd80e4aa/OCR/ppocr_v4/zh_cn/rec.onnx",
+      "sha256": "da4815ea386ee8083be319da8d20e70f4fdb0b6404ba0d2da7f675831e1b37fa"
+    },
+    {
+      "name": "OCR-keys",
+      "version": "ppocr_v4/zh_cn",
+      "file": "keys.txt",
+      "url": "https://raw.githubusercontent.com/MaaXYZ/MaaCommonAssets/dabcd4681ac990dc4361de26416d986abd80e4aa/OCR/ppocr_v4/zh_cn/keys.txt",
+      "sha256": "28b2362ad4ab2dc38769aa72feb535e3a9ddb3fd2a7585a05920e6393b1dc7f7"
+    }
+  ]
+}

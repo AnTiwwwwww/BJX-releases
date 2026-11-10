@@ -1,0 +1,19 @@
+{
+    "示例单人副本": {
+        "recognition": "DirectHit",
+        "action": "DoNothing",
+        "next": [
+            "点已知关闭",
+            "示例寻找入口"
+        ]
+    },
+    "示例寻找入口": {
+        "recognition": "OCR",
+        "expected": "待校准",
+        "action": "DoNothing",
+        "timeout": 1000,
+        "on_error": [
+            "留下截图"
+        ]
+    }
+}
