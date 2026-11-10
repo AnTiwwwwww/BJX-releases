@@ -13,6 +13,12 @@
 
 ## Windows CI 与发布门槛
 
+最终 [Windows 构建 42793631732](https://github.com/AnTiwwwwww/BJX-releases/actions/runs/42793631732) 已成功，公开源码提交为 `a09a969231c0a29e0bc28da851a43e7728ede4b1`：19 项前端测试、3 项 Rust 更新测试、6 项真实 App 安装条件和整包检查全部通过。`v0.4.2-beta.1` 已发布为预发布版本。
+
+发布后重新下载三份 ZIP，均与 GitHub 资产 digest 及各自 `.sha256` 一致。在本机隔离目录再次验证正式整包，139 个文件哈希、MXU 启动、隐私排除、账号配置保留、旧资源清理、10 个截止时间用例、7 个 PowerShell 用例及 MaaFramework/Agent 加载全部通过。
+
+程序包 `BJX-win-x86_64-v0.4.2-beta.1.zip` 的 SHA-256：`6250231caa7a6fc8cc082fd6758c67a39b6dd0d81f33bb3472573dc3ef6e4568`。完整 MXU 对应源码 ZIP 的 SHA-256：`cfe98ea7f2089f8ad4c276e501566425e2d7489a913394282da03e23fd37a3dd`。
+
 `release.yml` 必须通过 Rust 的真实文件哈希、安装门禁及全量更新保留测试，再构建 Windows EXE。整包检查还验证运行时回执、每个文件哈希、隔离启动、10 个次日截止用例、7 个 PowerShell 环境用例和 MaaFramework/Agent 加载。任一步失败不发布 Release。
 
 可在 [Actions](https://github.com/AnTiwwwwww/BJX-releases/actions/workflows/release.yml) 查看对应提交的实际结果；最终程序包与其构建回执绑定，不把本地模拟写作已完成 GUI 升级。
