@@ -21,6 +21,7 @@ function Test-PublicPath([string] $Relative) {
         $Relative -match '\.(delivery|finalize|finalize-summary|browser-check|visual-check)\.json$') { return $false }
     if ($Relative -in @('.gitignore', '.gitattributes', 'AGENTS.md', 'GLOSSARY.md', 'LICENSE', 'README.md', 'THIRD_PARTY_NOTICES.md', 'interface.json', 'accounts.example.csv')) { return $true }
     if ($Relative -match '^\.github/workflows/[^/]+\.yml$') { return $true }
+    if ($Relative -match '^integrations/mxu/[^/]+\.(md|json|patch)$') { return $true }
     if ($Relative -match '^docs/.+\.(md|json)$|^licenses/[^/]+\.txt$|^examples/[^/]+\.json$|^tools/[^/]+\.(ps1|py|cs)$') { return $true }
     if ($Relative -match '^resource/pipeline/[^/]+\.json$|^resource/(image|model)/\.gitkeep$') { return $true }
     if ($Relative -match '^scripts/(README\.md|imported\.json|_template/.+\.json)$|^tests/fixtures/royale/README\.md$') { return $true }
@@ -39,7 +40,7 @@ $secretPatterns = @(
 try {
     $files = @()
     $files += Get-ChildItem -LiteralPath $projectRoot -File -Force
-    foreach ($folder in @('docs', 'licenses', 'examples', 'tools', 'resource', 'scripts', 'tests/fixtures/royale', '.archify', '.github')) {
+    foreach ($folder in @('docs', 'licenses', 'examples', 'tools', 'resource', 'scripts', 'tests/fixtures/royale', '.archify', '.github', 'integrations')) {
         $path = Join-Path $projectRoot $folder
         if (Test-Path -LiteralPath $path) { $files += Get-ChildItem -LiteralPath $path -Recurse -File -Force }
     }

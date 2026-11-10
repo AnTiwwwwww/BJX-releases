@@ -2,14 +2,12 @@
 [CmdletBinding()]
 param([string] $SourcePath = '')
 $ErrorActionPreference = 'Stop'
-$revision = '5e923e83b30a102fb78da35c30ee2e1559aea682'
-$expectedHash = 'dcd85c14bdf4d32b685d0d667b86acccae8a465e3ab0e001cbf8e07fbf5e82ba'
+$recipe = Get-Content -LiteralPath (Join-Path (Split-Path $PSScriptRoot -Parent) 'integrations/mxu/build.json') -Raw | ConvertFrom-Json
+$expectedHash = $recipe.app_sha256
 $download = ''
 try {
     if (-not $SourcePath) {
-        $download = [IO.Path]::GetTempFileName()
-        Invoke-WebRequest -Uri "https://raw.githubusercontent.com/MaaXYZ/MXU/$revision/src/App.tsx" -OutFile $download -TimeoutSec 60
-        $SourcePath = $download
+        $SourcePath = Join-Path (Split-Path $PSScriptRoot -Parent) 'build/mxu-runtime/src/App.tsx'
     }
     # Git 在 Windows 检出时可能转换换行；按上游 UTF-8 / LF 内容校验。
     $sourceBytes = [Text.Encoding]::UTF8.GetBytes([IO.File]::ReadAllText([IO.Path]::GetFullPath($SourcePath)).Replace("`r`n", "`n"))
@@ -49,7 +47,7 @@ for (const [name, overrides, launchPending, expected] of cases) {
 '@
     & node -e $harness ([IO.Path]::GetFullPath($SourcePath))
     if ($LASTEXITCODE -ne 0) { throw 'MXU 运行中禁止自动安装检查失败。' }
-    Write-Output 'PASS: MXU 2.8.0 真实前端回调的 6 个条件；未进行界面安装或联网升级。'
+    Write-Output 'PASS: BJX 定制 MXU 真实前端回调的 6 个条件；未进行界面安装。'
 } finally {
     if ($download -and (Test-Path -LiteralPath $download)) { Remove-Item -LiteralPath $download }
 }

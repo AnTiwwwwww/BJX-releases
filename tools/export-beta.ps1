@@ -2,7 +2,8 @@
 [CmdletBinding()]
 param(
     [string] $OutputFile = '',
-    [string] $DependencyDirectory = ''
+    [string] $DependencyDirectory = '',
+    [string] $PatchedRuntimeDirectory = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -14,6 +15,16 @@ $interface = Get-Content -LiteralPath (Join-Path $projectRoot 'interface.json') 
 $dependencies = Get-Content -LiteralPath (Join-Path $projectRoot 'docs/dependencies.json') -Raw | ConvertFrom-Json
 if (-not $DependencyDirectory) { $DependencyDirectory = Join-Path $projectRoot 'deps' }
 $dependencyRoot = [IO.Path]::GetFullPath($DependencyDirectory)
+if (-not $PatchedRuntimeDirectory) { $PatchedRuntimeDirectory = Join-Path $projectRoot 'build/mxu-patched' }
+$runtimeRoot = [IO.Path]::GetFullPath($PatchedRuntimeDirectory)
+$runtimeRecipe = Get-Content -LiteralPath (Join-Path $projectRoot 'integrations/mxu/build.json') -Raw | ConvertFrom-Json
+$runtimeReceipt = Get-Content -LiteralPath (Join-Path $runtimeRoot 'build-receipt.json') -Raw | ConvertFrom-Json
+if ($runtimeReceipt.patch_sha256 -ne $runtimeRecipe.patch_sha256 -or
+    $runtimeReceipt.revision -ne $runtimeRecipe.revision -or
+    $runtimeReceipt.runtime_version -ne $runtimeRecipe.runtime_version -or
+    (Get-FileHash -LiteralPath (Join-Path $runtimeRoot 'mxu.exe') -Algorithm SHA256).Hash -ne $runtimeReceipt.exe_sha256) {
+    throw '定制 MXU 构建回执不匹配，请先运行 tools/build-mxu.ps1。'
+}
 
 $assets = @{}
 foreach ($asset in $dependencies.assets) {
@@ -54,7 +65,7 @@ try {
     [IO.Compression.ZipFile]::ExtractToDirectory($assets.MaaFramework, $maaExtract)
     [IO.Compression.ZipFile]::ExtractToDirectory($assets.MXU, $mxuExtract)
     Copy-Item -LiteralPath (Join-Path $maaExtract 'bin') -Destination (Join-Path $packageRoot 'maafw') -Recurse
-    Copy-Item -LiteralPath (Join-Path $mxuExtract 'mxu.exe') -Destination (Join-Path $packageRoot 'mxu.exe')
+    Copy-Item -LiteralPath (Join-Path $runtimeRoot 'mxu.exe') -Destination (Join-Path $packageRoot 'mxu.exe')
     $ocrDirectory = Join-Path $packageRoot 'resource/model/ocr'
     New-Item -ItemType Directory -Path $ocrDirectory -Force | Out-Null
     foreach ($name in @('OCR-det', 'OCR-rec', 'OCR-keys')) {
@@ -76,6 +87,7 @@ try {
         }
     }
     Copy-Item -LiteralPath (Join-Path $projectRoot 'docs/upstream-sources.md') -Destination (Join-Path $packageRoot 'third-party/UPSTREAM_SOURCES.md')
+    Copy-Item -LiteralPath (Join-Path $runtimeRoot 'build-receipt.json') -Destination (Join-Path $packageRoot 'third-party/MXU/BJX-build-receipt.json')
     & (Join-Path $packageRoot 'tools/build.ps1') -OutputDirectory (Join-Path $packageRoot 'tools') | Out-Null
 
     $startHere = @'
@@ -111,6 +123,7 @@ BJX {VERSION} 内测
         beta_tasks=@('单人吃鸡刷币', '定时开始')
         prerequisites=@('Windows x64', 'PowerShell 7 on PATH', 'Microsoft Edge WebView2 Runtime')
         dependency_assets=$dependencies.assets
+        patched_runtime=$runtimeReceipt
         files=$files
     } | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath (Join-Path $packageRoot 'BETA_MANIFEST.json') -Encoding utf8
 

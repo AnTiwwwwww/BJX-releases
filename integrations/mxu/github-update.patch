@@ -1,0 +1,854 @@
+diff --git a/package.json b/package.json
+index 3acd2c9..d53165e 100644
+--- a/package.json
++++ b/package.json
+@@ -1,7 +1,7 @@
+ {
+   "name": "mxu",
+   "private": true,
+-  "version": "0.1.0",
++  "version": "2.8.0-bjx.1",
+   "type": "module",
+   "scripts": {
+     "dev": "vite",
+diff --git a/src-tauri/Cargo.lock b/src-tauri/Cargo.lock
+index 326ffe3..0ce986a 100644
+--- a/src-tauri/Cargo.lock
++++ b/src-tauri/Cargo.lock
+@@ -3127,7 +3127,7 @@ dependencies = [
+ 
+ [[package]]
+ name = "mxu"
+-version = "0.1.0"
++version = "2.8.0-bjx.1"
+ dependencies = [
+  "axum",
+  "base64 0.22.1",
+diff --git a/src-tauri/Cargo.toml b/src-tauri/Cargo.toml
+index a1c34f0..4bb9142 100644
+--- a/src-tauri/Cargo.toml
++++ b/src-tauri/Cargo.toml
+@@ -1,6 +1,6 @@
+ [package]
+ name = "mxu"
+-version = "0.1.0"
++version = "2.8.0-bjx.1"
+ description = "A Tauri App"
+ authors = ["you"]
+ edition = "2021"
+diff --git a/src-tauri/src/commands/bjx_update.rs b/src-tauri/src/commands/bjx_update.rs
+new file mode 100644
+index 0000000..b975b46
+--- /dev/null
++++ b/src-tauri/src/commands/bjx_update.rs
+@@ -0,0 +1,73 @@
++//! BJX: verified packages and an install/task-start exclusion gate.
++use std::io::Read;
++use std::sync::{atomic::Ordering, Arc};
++use sha2::{Digest, Sha256};
++use tauri::State;
++use super::types::MaaState;
++
++pub fn begin_install(state: &MaaState) -> Result<(), String> {
++    // run_task_impl checks the flag while holding this same mutex.
++    let instances = state.instances.lock().map_err(|e| e.to_string())?;
++    if instances.values().any(|i| i.tasker.as_ref().is_some_and(|t| t.running())) {
++        return Err("BJX_TASKS_RUNNING".into());
++    }
++    state.update_in_progress.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
++        .map_err(|_| "BJX_UPDATE_IN_PROGRESS".to_string())?;
++    Ok(())
++}
++
++#[tauri::command]
++pub fn bjx_begin_update(state: State<Arc<MaaState>>) -> Result<(), String> {
++    begin_install(&state)
++}
++
++#[tauri::command]
++pub fn bjx_end_update(state: State<Arc<MaaState>>) {
++    state.update_in_progress.store(false, Ordering::SeqCst);
++}
++
++#[tauri::command]
++pub fn verify_update_sha256(file_path: String, expected: String) -> Result<(), String> {
++    if expected.len() != 64 || !expected.bytes().all(|c| c.is_ascii_hexdigit()) {
++        return Err("BJX_INVALID_CHECKSUM".into());
++    }
++    let mut file = std::fs::File::open(file_path).map_err(|e| e.to_string())?;
++    let mut hasher = Sha256::new();
++    let mut buffer = [0u8; 65536];
++    loop {
++        let count = file.read(&mut buffer).map_err(|e| e.to_string())?;
++        if count == 0 { break; }
++        hasher.update(&buffer[..count]);
++    }
++    if format!("{:x}", hasher.finalize()) != expected.to_ascii_lowercase() {
++        return Err("BJX_CHECKSUM_MISMATCH".into());
++    }
++    Ok(())
++}
++
++#[cfg(test)]
++mod tests {
++    use super::*;
++    #[test]
++    fn bjx_update_gate_is_exclusive_and_releasable() {
++        let state = MaaState::default();
++        assert!(begin_install(&state).is_ok());
++        assert!(state.update_in_progress.load(Ordering::SeqCst));
++        assert!(begin_install(&state).is_err());
++        state.update_in_progress.store(false, Ordering::SeqCst);
++        assert!(begin_install(&state).is_ok());
++    }
++    #[test]
++    fn bjx_update_hash_rejects_corruption_and_missing_digest() {
++        let path = std::env::temp_dir().join(format!("bjx-hash-{}.zip", std::process::id()));
++        std::fs::write(&path, b"abc").unwrap();
++        let path_str = path.to_string_lossy().to_string();
++        let expected = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad".to_string();
++        assert!(verify_update_sha256(path_str.clone(), expected.clone()).is_ok());
++        assert!(verify_update_sha256(path_str.clone(), expected.to_uppercase()).is_ok());
++        assert!(verify_update_sha256(path_str.clone(), String::new()).is_err());
++        std::fs::write(&path, b"tampered").unwrap();
++        assert!(verify_update_sha256(path_str, expected).is_err());
++        std::fs::remove_file(path).unwrap();
++    }
++}
+diff --git a/src-tauri/src/commands/maa_core.rs b/src-tauri/src/commands/maa_core.rs
+index c32d227..6909990 100644
+--- a/src-tauri/src/commands/maa_core.rs
++++ b/src-tauri/src/commands/maa_core.rs
+@@ -1314,6 +1314,9 @@ pub fn run_task_impl(
+     selected_task_id: Option<&str>,
+ ) -> Result<i64, String> {
+     let mut instances = state.instances.lock().map_err(|e| e.to_string())?;
++    if state.update_in_progress.load(std::sync::atomic::Ordering::SeqCst) {
++        return Err("BJX_UPDATE_IN_PROGRESS".into());
++    }
+     let instance = instances.get_mut(instance_id).ok_or("Instance not found")?;
+ 
+     let resource = instance.resource.as_ref().ok_or("Resource not loaded")?;
+diff --git a/src-tauri/src/commands/mod.rs b/src-tauri/src/commands/mod.rs
+index 954ebdf..b6aa056 100644
+--- a/src-tauri/src/commands/mod.rs
++++ b/src-tauri/src/commands/mod.rs
+@@ -29,6 +29,7 @@ mod task_diagnostics;
+ pub mod telemetry;
+ pub mod tray;
+ pub mod update;
++pub mod bjx_update;
+ 
+ // 重新导出类型（供 lib.rs 使用）
+ pub use app_config::AppConfigState;
+diff --git a/src-tauri/src/commands/types.rs b/src-tauri/src/commands/types.rs
+index abe9de5..069fdbf 100644
+--- a/src-tauri/src/commands/types.rs
++++ b/src-tauri/src/commands/types.rs
+@@ -337,6 +337,7 @@ impl LogBuffer {
+ /// MaaFramework 运行时状态
+ #[derive(Default)]
+ pub struct MaaState {
++    pub update_in_progress: std::sync::atomic::AtomicBool,
+     pub lib_dir: Mutex<Option<PathBuf>>,
+     pub resource_dir: Mutex<Option<PathBuf>>,
+     pub instances: Mutex<HashMap<String, InstanceRuntime>>,
+diff --git a/src-tauri/src/commands/update.rs b/src-tauri/src/commands/update.rs
+index 5c2fb95..a822701 100644
+--- a/src-tauri/src/commands/update.rs
++++ b/src-tauri/src/commands/update.rs
+@@ -305,6 +305,7 @@ pub fn apply_full_update(extract_dir: String, target_dir: String) -> Result<(),
+     let entries: Vec<_> = std::fs::read_dir(extract_path)
+         .map_err(|e| format!("无法读取解压目录: {}", e))?
+         .filter_map(|e| e.ok())
++        .filter(|e| !is_bjx_user_data(&e.file_name().to_string_lossy()))
+         .collect();
+ 
+     // 2. 尝试将目标目录中与新包同名的文件/文件夹移动到 old 文件夹（失败不阻断）
+@@ -336,7 +337,16 @@ pub fn apply_full_update(extract_dir: String, target_dir: String) -> Result<(),
+     }
+ 
+     // 3. 复制新包内容到目标目录 - 这一步必须执行
+-    copy_dir_contents(&extract_dir, &target_dir, Some(&["changes.json"]))?;
++    for entry in &entries {
++        let name = entry.file_name();
++        if name == "changes.json" { continue; }
++        let destination = target_path.join(&name);
++        if entry.path().is_dir() {
++            copy_dir_contents(&entry.path().to_string_lossy(), &destination.to_string_lossy(), None)?;
++        } else {
++            std::fs::copy(entry.path(), &destination).map_err(|e| e.to_string())?;
++        }
++    }
+ 
+     if !move_errors.is_empty() {
+         info!(
+@@ -537,3 +547,38 @@ pub fn fallback_update(
+ 
+     Ok(result_path)
+ }
++
++// BJX user-owned data is never replaced by a full update.
++fn is_bjx_user_data(name: &str) -> bool {
++    let lower = name.to_ascii_lowercase();
++    ["config", "cache", "debug", "logs", "accounts.csv"].contains(&lower.as_str()) ||
++        lower.contains(".local.") || lower.starts_with("accounts.csv.")
++}
++
++#[cfg(test)]
++mod bjx_tests {
++    use super::*;
++    #[test]
++    fn bjx_update_preserves_user_data_and_replaces_resources() {
++        let root = std::env::temp_dir().join(format!("bjx-install-{}", std::process::id()));
++        let old = root.join("installed");
++        let new = root.join("package");
++        std::fs::create_dir_all(old.join("resource")).unwrap();
++        std::fs::create_dir_all(old.join("config")).unwrap();
++        std::fs::create_dir_all(new.join("resource")).unwrap();
++        std::fs::create_dir_all(new.join("config")).unwrap();
++        std::fs::write(old.join("resource/obsolete.json"), "old").unwrap();
++        std::fs::write(new.join("resource/new.json"), "new").unwrap();
++        for name in ["accounts.csv", "notify.local.json", "config/instances.json"] {
++            std::fs::write(old.join(name), "private-fixture").unwrap();
++            std::fs::write(new.join(name), "must-not-overwrite").unwrap();
++        }
++        apply_full_update(new.to_string_lossy().into(), old.to_string_lossy().into()).unwrap();
++        for name in ["accounts.csv", "notify.local.json", "config/instances.json"] {
++            assert_eq!(std::fs::read_to_string(old.join(name)).unwrap(), "private-fixture");
++        }
++        assert!(!old.join("resource/obsolete.json").exists());
++        assert_eq!(std::fs::read_to_string(old.join("resource/new.json")).unwrap(), "new");
++        std::fs::remove_dir_all(root).unwrap();
++    }
++}
+diff --git a/src-tauri/src/lib.rs b/src-tauri/src/lib.rs
+index 6cd8b24..440ba64 100644
+--- a/src-tauri/src/lib.rs
++++ b/src-tauri/src/lib.rs
+@@ -289,6 +289,9 @@ pub fn run() {
+             commands::update::check_changes_json,
+             commands::update::apply_incremental_update,
+             commands::update::apply_full_update,
++            commands::bjx_update::verify_update_sha256,
++            commands::bjx_update::bjx_begin_update,
++            commands::bjx_update::bjx_end_update,
+             commands::update::cleanup_extract_dir,
+             commands::update::fallback_update,
+             commands::update::move_file_to_old,
+diff --git a/src-tauri/tauri.conf.json b/src-tauri/tauri.conf.json
+index f98495c..31e6b56 100644
+--- a/src-tauri/tauri.conf.json
++++ b/src-tauri/tauri.conf.json
+@@ -1,7 +1,7 @@
+ {
+   "$schema": "https://schema.tauri.app/config/2",
+   "productName": "mxu",
+-  "version": "0.1.0",
++  "version": "2.8.0-bjx.1",
+   "identifier": "com.misteo.mxu",
+   "build": {
+     "beforeDevCommand": "pnpm dev",
+diff --git a/src/App.tsx b/src/App.tsx
+index 8bd0343..64e954e 100644
+--- a/src/App.tsx
++++ b/src/App.tsx
+@@ -465,6 +465,7 @@ function App() {
+ 
+         const result = await downloadUpdate({
+           url: updateResult.downloadUrl,
++          sha256: updateResult.sha256,
+           savePath,
+           totalSize: updateResult.fileSize,
+           proxySettings: proxyForDownload,
+@@ -488,6 +489,7 @@ function App() {
+             fileSize: updateResult.fileSize,
+             updateType: updateResult.updateType,
+             downloadSource: updateResult.downloadSource,
++            sha256: updateResult.sha256,
+             timestamp: Date.now(),
+           });
+ 
+@@ -1024,7 +1026,7 @@ function App() {
+ 
+       // 检查是否有待安装的更新（上次下载完成但未安装）
+       // 调试版本跳过待安装更新检测
+-      if (!isDebugVersion(result.interface.version)) {
++      if (!isDebugVersion(result.interface.version, !result.interface.mirrorchyan_rid && !!result.interface.github)) {
+         const pendingUpdate = await getPendingUpdateInfo();
+         if (pendingUpdate) {
+           log.info('检测到待安装更新:', pendingUpdate.versionName);
+@@ -1037,6 +1039,7 @@ function App() {
+             fileSize: pendingUpdate.fileSize,
+             updateType: pendingUpdate.updateType,
+             downloadSource: pendingUpdate.downloadSource,
++            sha256: pendingUpdate.sha256,
+           });
+           setDownloadSavePath(pendingUpdate.downloadSavePath);
+           // 先设置 installStatus，再设置 downloadStatus，
+@@ -1055,10 +1058,10 @@ function App() {
+       }
+ 
+       // 自动检查更新并下载（调试版本跳过，MXU 开发模式跳过）
+-      if (result.interface.mirrorchyan_rid && result.interface.version) {
++      if ((result.interface.mirrorchyan_rid || result.interface.github) && result.interface.version) {
+         if (import.meta.env.DEV) {
+           log.info('MXU 开发模式，跳过自动更新检查');
+-        } else if (isDebugVersion(result.interface.version)) {
++        } else if (isDebugVersion(result.interface.version, !result.interface.mirrorchyan_rid && !!result.interface.github)) {
+           log.info(`非正式版本 (${result.interface.version})，跳过自动更新检查`);
+         } else {
+           const appState = useAppStore.getState();
+diff --git a/src/components/InstallConfirmModal.tsx b/src/components/InstallConfirmModal.tsx
+index abc1cc8..922c872 100644
+--- a/src/components/InstallConfirmModal.tsx
++++ b/src/components/InstallConfirmModal.tsx
+@@ -62,6 +62,7 @@ export function InstallConfirmModal() {
+     try {
+       const success = await installUpdate({
+         zipPath: downloadSavePath,
++        sha256: updateInfo.sha256,
+         targetDir: basePath,
+         newVersion: updateInfo.versionName,
+         projectName,
+@@ -168,6 +169,7 @@ export function InstallConfirmModal() {
+         try {
+           const success = await installUpdate({
+             zipPath: downloadSavePath,
++        sha256: updateInfo.sha256,
+             targetDir: basePath,
+             newVersion: updateInfo.versionName,
+             projectName,
+diff --git a/src/components/SettingsPage.tsx b/src/components/SettingsPage.tsx
+index 8280e91..365e3d5 100644
+--- a/src/components/SettingsPage.tsx
++++ b/src/components/SettingsPage.tsx
+@@ -272,15 +272,15 @@ export function SettingsPage({ onClose }: SettingsPageProps) {
+     items.push({ id: 'general', icon: Settings2, labelKey: 'settings.general' });
+     items.push({ id: 'hotkeys', icon: Keyboard, labelKey: 'settings.hotkeys' });
+     items.push({ id: 'webserver', icon: Globe, labelKey: 'webserver.title' });
+-    if (projectInterface?.mirrorchyan_rid) {
+-      items.push({ id: 'update', icon: Download, labelKey: 'mirrorChyan.title' });
++    if (projectInterface?.mirrorchyan_rid || projectInterface?.github) {
++      items.push({ id: 'update', icon: Download, labelKey: projectInterface.mirrorchyan_rid ? 'mirrorChyan.title' : 'bjxUpdate.title' });
+     }
+     items.push(
+       { id: 'debug', icon: Bug, labelKey: 'debug.title' },
+       { id: 'about', icon: Info, labelKey: 'about.title' },
+     );
+     return items;
+-  }, [projectInterface?.mirrorchyan_rid, settingsSections.length]);
++  }, [projectInterface?.mirrorchyan_rid, projectInterface?.github, settingsSections.length]);
+ 
+   // 当前高亮的 section
+   const [activeSection, setActiveSection] = useState('appearance');
+diff --git a/src/components/UpdatePanel.tsx b/src/components/UpdatePanel.tsx
+index e3e3bf3..ff3fc77 100644
+--- a/src/components/UpdatePanel.tsx
++++ b/src/components/UpdatePanel.tsx
+@@ -69,6 +69,7 @@ export function UpdatePanel({ onClose, anchorRef }: UpdatePanelProps) {
+ 
+       const result = await downloadUpdate({
+         url: updateInfo.downloadUrl,
++          sha256: updateInfo.sha256,
+         savePath,
+         totalSize: updateInfo.fileSize,
+         proxySettings: proxyForDownload,
+diff --git a/src/components/settings/UpdateSection.tsx b/src/components/settings/UpdateSection.tsx
+index bd9aaf3..ccc06f4 100644
+--- a/src/components/settings/UpdateSection.tsx
++++ b/src/components/settings/UpdateSection.tsx
+@@ -79,13 +79,13 @@ export function UpdateSection() {
+ 
+   // 检查是否禁用代理（填写了 MirrorChyan CDK）
+   const isProxyDisabled = useMemo(() => {
+-    return mirrorChyanSettings.cdk && mirrorChyanSettings.cdk.trim() !== '';
+-  }, [mirrorChyanSettings.cdk]);
++    return !!projectInterface?.mirrorchyan_rid && !!mirrorChyanSettings.cdk?.trim();
++  }, [mirrorChyanSettings.cdk, projectInterface?.mirrorchyan_rid]);
+ 
+   // 判断是否为调试版本（interface 调试版本，或 MXU 自身开发模式）
+   const isDebugMode = useMemo(() => {
+-    return import.meta.env.DEV || isDebugVersion(projectInterface?.version);
+-  }, [projectInterface?.version]);
++    return import.meta.env.DEV || isDebugVersion(projectInterface?.version, !projectInterface?.mirrorchyan_rid && !!projectInterface?.github);
++  }, [projectInterface?.version, projectInterface?.github, projectInterface?.mirrorchyan_rid]);
+ 
+   // 处理代理输入框失焦事件
+   const handleProxyBlur = useCallback(() => {
+@@ -141,6 +141,7 @@ export function UpdateSection() {
+ 
+         const result = await downloadUpdate({
+           url: info.downloadUrl,
++          sha256: info.sha256,
+           savePath,
+           totalSize: info.fileSize,
+           proxySettings: proxyForDownload,
+@@ -309,7 +310,7 @@ export function UpdateSection() {
+ 
+   // 检查更新
+   const handleCheckUpdate = async () => {
+-    if (!projectInterface?.mirrorchyan_rid || !projectInterface?.version) {
++    if ((!projectInterface?.mirrorchyan_rid && !projectInterface?.github) || !projectInterface?.version) {
+       addDebugLog('未配置 mirrorchyan_rid 或 version，无法检查更新');
+       return;
+     }
+@@ -363,7 +364,7 @@ export function UpdateSection() {
+     }
+   };
+ 
+-  if (!projectInterface?.mirrorchyan_rid) {
++  if (!projectInterface?.mirrorchyan_rid && !projectInterface?.github) {
+     return null;
+   }
+ 
+@@ -371,7 +372,7 @@ export function UpdateSection() {
+     <section id="section-update" className="space-y-4 scroll-mt-4">
+       <h2 className="text-sm font-semibold text-text-primary uppercase tracking-wider flex items-center gap-2">
+         <Download className="w-4 h-4" />
+-        {t('mirrorChyan.title')}
++        {t(projectInterface.mirrorchyan_rid ? 'mirrorChyan.title' : 'bjxUpdate.title')}
+       </h2>
+ 
+       <div className="bg-bg-secondary rounded-xl p-4 border border-border space-y-5">
+@@ -416,7 +417,7 @@ export function UpdateSection() {
+             </div>
+ 
+             {/* CDK 输入 */}
+-            <div className="pt-4 border-t border-border">
++            {projectInterface.mirrorchyan_rid && <div className="pt-4 border-t border-border">
+               <div className="flex items-center gap-3 mb-3">
+                 <Key className="w-5 h-5 text-accent" />
+                 <span className="font-medium text-text-primary">{t('mirrorChyan.cdk')}</span>
+@@ -455,7 +456,8 @@ export function UpdateSection() {
+                   {t('mirrorChyan.cdkHintAfterLink', { projectName })}
+                 </p>
+               </div>
+-            </div>
++            </div>}
++            {!projectInterface.mirrorchyan_rid && <p className="text-sm text-text-muted">{t('bjxUpdate.hint')}</p>}
+ 
+             {/* 代理设置 */}
+             {!isProxyDisabled && (
+diff --git a/src/i18n/locales/en-US.ts b/src/i18n/locales/en-US.ts
+index dd052f0..906db3e 100644
+--- a/src/i18n/locales/en-US.ts
++++ b/src/i18n/locales/en-US.ts
+@@ -1,4 +1,6 @@
+ export default {
++  bjxUpdate: {"title": "GitHub Updates", "hint": "Public GitHub Releases; no CDK required. Beta is the default channel. Packages are SHA-256 verified and installed only after all tasks stop.", "tasksRunning": "Tasks are running or an update is in progress. Stop all tasks before installing.", "checksumFailed": "Package verification failed. Download the update again."},
++
+   // Common
+   common: {
+     confirm: 'Confirm',
+diff --git a/src/i18n/locales/ja-JP.ts b/src/i18n/locales/ja-JP.ts
+index 52e6a68..4a80ce4 100644
+--- a/src/i18n/locales/ja-JP.ts
++++ b/src/i18n/locales/ja-JP.ts
+@@ -1,4 +1,6 @@
+ export default {
++  bjxUpdate: {"title": "GitHub Updates", "hint": "Public GitHub Releases; no CDK required. Beta is the default channel. Packages are SHA-256 verified and installed only after all tasks stop.", "tasksRunning": "Tasks are running or an update is in progress. Stop all tasks before installing.", "checksumFailed": "Package verification failed. Download the update again."},
++
+   // 共通
+   common: {
+     confirm: '確定',
+diff --git a/src/i18n/locales/ko-KR.ts b/src/i18n/locales/ko-KR.ts
+index 0491740..be995e4 100644
+--- a/src/i18n/locales/ko-KR.ts
++++ b/src/i18n/locales/ko-KR.ts
+@@ -1,4 +1,6 @@
+ export default {
++  bjxUpdate: {"title": "GitHub Updates", "hint": "Public GitHub Releases; no CDK required. Beta is the default channel. Packages are SHA-256 verified and installed only after all tasks stop.", "tasksRunning": "Tasks are running or an update is in progress. Stop all tasks before installing.", "checksumFailed": "Package verification failed. Download the update again."},
++
+   // 공통
+   common: {
+     confirm: '확인',
+diff --git a/src/i18n/locales/zh-CN.ts b/src/i18n/locales/zh-CN.ts
+index cdbca16..e2e0e2d 100644
+--- a/src/i18n/locales/zh-CN.ts
++++ b/src/i18n/locales/zh-CN.ts
+@@ -1,4 +1,6 @@
+ export default {
++  bjxUpdate: {"title": "GitHub 更新", "hint": "从公开 GitHub Releases 获取新版，无需 CDK。默认内测频道；下载后校验 SHA-256，所有任务停止后才安装。", "tasksRunning": "任务仍在运行或更新尚未完成，请停止所有任务后再安装。", "checksumFailed": "安装包校验失败，请重新下载更新。"},
++
+   // 通用
+   common: {
+     confirm: '确定',
+diff --git a/src/i18n/locales/zh-TW.ts b/src/i18n/locales/zh-TW.ts
+index fa4098b..527ade2 100644
+--- a/src/i18n/locales/zh-TW.ts
++++ b/src/i18n/locales/zh-TW.ts
+@@ -1,4 +1,6 @@
+ export default {
++  bjxUpdate: {"title": "GitHub 更新", "hint": "从公开 GitHub Releases 获取新版，无需 CDK。默认内测频道；下载后校验 SHA-256，所有任务停止后才安装。", "tasksRunning": "任务仍在运行或更新尚未完成，请停止所有任务后再安装。", "checksumFailed": "安装包校验失败，请重新下载更新。"},
++
+   // 通用
+   common: {
+     confirm: '確定',
+diff --git a/src/services/githubUpdate.ts b/src/services/githubUpdate.ts
+new file mode 100644
+index 0000000..960f6ba
+--- /dev/null
++++ b/src/services/githubUpdate.ts
+@@ -0,0 +1,89 @@
++import * as semver from 'semver';
++
++// BJX publishes complete Windows x64 packages; never guess a source/archive asset.
++export interface ReleaseAsset {
++  name: string;
++  size: number;
++  browser_download_url: string;
++  digest?: string | null;
++}
++export interface Release {
++  tag_name: string;
++  body: string | null;
++  draft: boolean;
++  prerelease: boolean;
++  assets: ReleaseAsset[];
++}
++export interface GitHubUpdateOptions {
++  githubUrl: string;
++  currentVersion: string;
++  channel?: string;
++  projectName: string;
++  os: string;
++  arch: string;
++}
++
++export function isReleaseVersion(version: string): boolean {
++  const parsed = semver.parse(version.replace(/^v/i, ''));
++  return !!parsed && (parsed.prerelease.length === 0 ||
++    ['beta', 'rc'].includes(String(parsed.prerelease[0])));
++}
++
++export async function checkGitHubUpdate(
++  options: GitHubUpdateOptions,
++  fetcher: (url: string) => Promise<Response>,
++) {
++  const repo = new URL(options.githubUrl);
++  if (repo.origin !== 'https://github.com' || repo.username || repo.password ||
++      repo.search || repo.hash || !/^\/[\w.-]+\/[\w.-]+\/?$/.test(repo.pathname)) {
++    throw new Error('Invalid GitHub repository URL');
++  }
++  if (options.os !== 'windows' || !['x86_64', 'amd64', 'x64'].includes(options.arch)) {
++    throw new Error('BJX updates require Windows x64');
++  }
++  if (!isReleaseVersion(options.currentVersion) || !/^[\w.-]+$/.test(options.projectName)) {
++    throw new Error('Invalid release version or project name');
++  }
++  const repoPath = repo.pathname.replace(/\/$/, '');
++  const response = await fetcher(`https://api.github.com/repos${repoPath}/releases?per_page=100`);
++  if (!response.ok) throw new Error(`GitHub release check failed: HTTP ${response.status}`);
++  const releases: Release[] = await response.json();
++  if (!Array.isArray(releases)) throw new Error('Invalid GitHub release response');
++  const current = options.currentVersion.replace(/^v/i, '');
++  const candidates = releases.filter((r) => !r.draft && isReleaseVersion(r.tag_name) &&
++    (options.channel === 'beta' || (!r.prerelease && !semver.prerelease(r.tag_name))) &&
++    semver.gt(r.tag_name, current)).sort((a, b) => semver.rcompare(a.tag_name, b.tag_name));
++  if (!candidates.length) {
++    return { hasUpdate: false, versionName: current, releaseNote: '' };
++  }
++  const release = candidates[0];
++  const version = semver.valid(release.tag_name)!;
++  const filename = `${options.projectName}-win-x86_64-v${version}.zip`;
++  const asset = release.assets.find((a) => a.name === filename);
++  if (!asset || asset.size <= 0) throw new Error('Release has no complete Windows x64 package');
++  const assetUrl = (name: string) => `https://github.com${repoPath}/releases/download/${encodeURIComponent(release.tag_name)}/${name}`;
++  if (asset.browser_download_url !== assetUrl(filename)) throw new Error('Unexpected release asset URL');
++  let sha256: string | undefined;
++  if (asset.digest) {
++    const digest = /^sha256:([a-f\d]{64})$/i.exec(asset.digest);
++    if (!digest) throw new Error('Invalid release digest');
++    sha256 = digest[1].toLowerCase();
++  } else {
++    const checksumName = `${filename}.sha256`;
++    const checksum = release.assets.find((a) => a.name === checksumName);
++    if (!checksum || checksum.browser_download_url !== assetUrl(checksumName) || checksum.size > 4096) {
++      throw new Error('Release is missing SHA-256 verification');
++    }
++    const checksumResponse = await fetcher(checksum.browser_download_url);
++    if (!checksumResponse.ok) throw new Error('Cannot download release checksum');
++    const match = /^([a-f\d]{64})\s+\*?([^\r\n]+)\s*$/i.exec(await checksumResponse.text());
++    if (!match || match[2] !== filename) throw new Error('Invalid release checksum');
++    sha256 = match[1].toLowerCase();
++  }
++  return {
++    hasUpdate: true, versionName: version, releaseNote: release.body || '',
++    channel: release.prerelease ? 'beta' : 'stable',
++    downloadUrl: asset.browser_download_url, filename, fileSize: asset.size,
++    sha256, updateType: 'full' as const, downloadSource: 'github' as const,
++  };
++}
+diff --git a/src/services/proxyService.ts b/src/services/proxyService.ts
+index 8db61d1..576c55b 100644
+--- a/src/services/proxyService.ts
++++ b/src/services/proxyService.ts
+@@ -123,12 +123,12 @@ export function shouldUseProxy(
+ export function proxySettingsForUpdateDownload(
+   downloadSource: 'mirrorchyan' | 'github' | undefined,
+   proxySettings: ProxySettings | undefined,
+-  mirrorChyanCdk: string | undefined,
++  _mirrorChyanCdk: string | undefined,
+ ): ProxySettings | undefined {
+   if (downloadSource !== 'github') {
+     return undefined;
+   }
+-  return shouldUseProxy(proxySettings, mirrorChyanCdk || '') ? proxySettings : undefined;
++  return shouldUseProxy(proxySettings, '') ? proxySettings : undefined;
+ }
+ 
+ /**
+diff --git a/src/services/updateService.ts b/src/services/updateService.ts
+index b98f555..3c65d36 100644
+--- a/src/services/updateService.ts
++++ b/src/services/updateService.ts
+@@ -12,6 +12,8 @@ import { exists } from '@tauri-apps/plugin-fs';
+ import { fetch as tauriFetch } from '@tauri-apps/plugin-http';
+ import { openPath, openUrl } from '@tauri-apps/plugin-opener';
+ import * as semver from 'semver';
++import i18n from '@/i18n';
++import { checkGitHubUpdate, isReleaseVersion } from './githubUpdate';
+ 
+ import { backupConfigBeforeUpdate } from './configService';
+ import { downloadWithProxy } from './proxyService';
+@@ -240,7 +242,7 @@ async function buildUserAgent(): Promise<string> {
+ }
+ 
+ export interface CheckUpdateOptions {
+-  resourceId: string; // mirrorchyan_rid
++  resourceId?: string; // mirrorchyan_rid
+   currentVersion: string; // 当前版本
+   cdk?: string; // MirrorChyan CDK
+   channel?: UpdateChannel; // 更新频道
+@@ -400,7 +402,8 @@ export async function checkUpdate(options: CheckUpdateOptions): Promise<UpdateIn
+  * - 版本号小于 "1.0.0"
+  * - 版本号包含预发布标签，且不是 beta 或 rc（如 v2.0.2-ci.123、v1.0.0-alpha.1）
+  */
+-export function isDebugVersion(version: string | undefined): boolean {
++export function isDebugVersion(version: string | undefined, githubOnly = false): boolean {
++  if (githubOnly) return !version || !isReleaseVersion(version);
+   if (!version) return false;
+   if (version === 'DEBUG_VERSION') return true;
+ 
+@@ -723,6 +726,7 @@ export async function getGitHubDownloadUrl(
+ }
+ 
+ interface DownloadUpdateOptions {
++  sha256?: string;
+   url: string;
+   savePath: string;
+   totalSize?: number;
+@@ -825,6 +829,17 @@ export async function downloadUpdate(
+     // 等待下载完成，返回下载结果
+     const result = await downloadPromise;
+     currentSessionId = result.session_id;
++    const project = useAppStore.getState().projectInterface;
++    if (options.sha256 || (project?.github && !project.mirrorchyan_rid)) {
++      await invoke('verify_update_sha256', { filePath: result.actual_save_path, expected: options.sha256 || '' });
++    }
++    if (downloadCancelled) return { success: false };
++    const info = useAppStore.getState().updateInfo;
++    if (info?.hasUpdate && info.sha256 === options.sha256) {
++      savePendingUpdateInfo({
++        ...info, downloadSavePath: result.actual_save_path, timestamp: Date.now(),
++      });
++    }
+ 
+     log.info(`下载完成 (session ${result.session_id})`);
+     log.info(`实际保存路径: ${result.actual_save_path}`);
+@@ -880,7 +895,18 @@ export async function checkAndPrepareDownload(
+ 
+   const { githubUrl, cdk, channel, githubPat, projectName, proxyUrl, ...checkOptions } = options;
+ 
+-  // 始终使用 Mirror酱 检查更新
++  if (!checkOptions.resourceId && githubUrl) {
++    return checkGitHubUpdate({
++      githubUrl, currentVersion: checkOptions.currentVersion, channel,
++      projectName: projectName || 'BJX', os: getOS(), arch: await getArch(),
++    }, (url) => tauriFetch(url, {
++      headers: { 'Accept': 'application/vnd.github+json', 'User-Agent': 'BJX-updater', 'X-GitHub-Api-Version': '2022-11-28' },
++      connectTimeout: 15_000,
++      signal: AbortSignal.timeout(30_000),
++      ...(proxyUrl ? { proxy: { all: proxyUrl } } : {}),
++    }));
++  }
++  // MirrorChyan projects retain their original provider.
+   const updateInfo = await checkUpdate({ ...checkOptions, cdk, channel });
+ 
+   if (!updateInfo || !updateInfo.hasUpdate) {
+@@ -955,6 +981,7 @@ interface ChangesJson {
+ }
+ 
+ export interface InstallUpdateOptions {
++  sha256?: string;
+   zipPath: string; // 下载的更新包路径
+   targetDir: string; // 目标安装目录
+   newVersion: string; // 新版本号（用于兜底时创建文件夹）
+@@ -985,13 +1012,32 @@ export async function installUpdate(options: InstallUpdateOptions): Promise<bool
+     log.warn('installUpdate: 已有安装正在进行，跳过重复调用');
+     return false;
+   }
++  if (useAppStore.getState().instances.some((i) => i.isRunning)) {
++    throw new Error(i18n.t('bjxUpdate.tasksRunning'));
++  }
+   isInstalling = true;
++  let gateAcquired = false;
++  let installed = false;
+ 
+   const { zipPath, targetDir, newVersion, projectName, onProgress } = options;
+ 
+   log.info(`开始安装更新: ${zipPath} -> ${targetDir}`);
+ 
+   try {
++    const project = useAppStore.getState().projectInterface;
++    if (options.sha256 || (project?.github && !project.mirrorchyan_rid)) {
++      try {
++        await invoke('verify_update_sha256', { filePath: zipPath, expected: options.sha256 || '' });
++      } catch {
++        throw new Error(i18n.t('bjxUpdate.checksumFailed'));
++      }
++    }
++    // Recheck after the asynchronous checksum, then exclude native task starts.
++    if (useAppStore.getState().instances.some((i) => i.isRunning)) {
++      throw new Error(i18n.t('bjxUpdate.tasksRunning'));
++    }
++    try { await invoke('bjx_begin_update'); gateAcquired = true; }
++    catch { throw new Error(i18n.t('bjxUpdate.tasksRunning')); }
+     await backupConfigBeforeUpdate(targetDir, projectName);
+ 
+     // 对于 exe/dmg 文件，直接打开而不是解压
+@@ -1077,6 +1123,7 @@ export async function installUpdate(options: InstallUpdateOptions): Promise<bool
+         log.warn('清理更新残留产物失败（忽略）:', e);
+       });
+ 
++      installed = true;
+       log.info('更新安装完成');
+       onProgress?.('done');
+ 
+@@ -1122,6 +1169,8 @@ export async function installUpdate(options: InstallUpdateOptions): Promise<bool
+       }
+     }
+   } finally {
++    // Successful installs keep task starts blocked until the updated app restarts.
++    if (gateAcquired && !installed) await invoke('bjx_end_update');
+     isInstalling = false;
+   }
+ }
+@@ -1165,6 +1214,7 @@ export interface UpdateCompleteInfo {
+  * 待安装的更新信息（下载完成后保存，用于下次启动时自动安装）
+  */
+ export interface PendingUpdateInfo {
++  sha256?: string;
+   versionName: string;
+   releaseNote: string;
+   channel?: string;
+@@ -1244,6 +1294,14 @@ export async function getPendingUpdateInfo(): Promise<PendingUpdateInfo | null>
+     if (!data) return null;
+ 
+     const info = JSON.parse(data) as PendingUpdateInfo;
++    const project = useAppStore.getState().projectInterface;
++    if (project?.github && !project.mirrorchyan_rid &&
++        (!info.sha256 || !/^[a-f\d]{64}$/i.test(info.sha256) ||
++         !isReleaseVersion(info.versionName) || !project.version ||
++         !semver.gt(info.versionName, project.version))) {
++      localStorage.removeItem(PENDING_UPDATE_STORAGE_KEY);
++      return null;
++    }
+ 
+     // 检查更新包文件是否仍然存在
+     if (info.downloadSavePath && !(await exists(info.downloadSavePath))) {
+diff --git a/src/stores/types.ts b/src/stores/types.ts
+index 6ba8cf3..5002f4e 100644
+--- a/src/stores/types.ts
++++ b/src/stores/types.ts
+@@ -53,6 +53,7 @@ export interface ScheduleExecutionInfo {
+ 
+ // 更新信息类型
+ export interface UpdateInfo {
++  sha256?: string;
+   hasUpdate: boolean;
+   versionName: string;
+   releaseNote: string;
+diff --git a/src/types/config.ts b/src/types/config.ts
+index 0931274..94f9d7b 100644
+--- a/src/types/config.ts
++++ b/src/types/config.ts
+@@ -201,7 +201,7 @@ export const defaultWindowSize: WindowSize = {
+ // 默认 MirrorChyan 设置
+ export const defaultMirrorChyanSettings: MirrorChyanSettings = {
+   cdk: '',
+-  channel: 'stable',
++  channel: 'beta',
+ };
+ 
+ // 默认截图帧率
+diff --git a/tests/githubUpdate.test.ts b/tests/githubUpdate.test.ts
+new file mode 100644
+index 0000000..664704c
+--- /dev/null
++++ b/tests/githubUpdate.test.ts
+@@ -0,0 +1,63 @@
++import assert from 'node:assert/strict';
++import test from 'node:test';
++import { checkGitHubUpdate, isReleaseVersion, type Release } from '../src/services/githubUpdate';
++
++const options = { githubUrl: 'https://github.com/AnTiwwwwww/BJX-releases', currentVersion: '0.4.1-beta.1', channel: 'beta', projectName: 'BJX', os: 'windows', arch: 'x86_64' };
++const hash = 'a'.repeat(64);
++function release(tag = 'v0.4.2-beta.1'): Release {
++  const name = `BJX-win-x86_64-${tag}.zip`;
++  return { tag_name: tag, draft: false, prerelease: tag.includes('-'), body: 'Update notes', assets: [{ name, size: 123, browser_download_url: `${options.githubUrl}/releases/download/${tag}/${name}`, digest: `sha256:${hash}` }] };
++}
++const fetchReleases = (releases: Release[]) => async () => new Response(JSON.stringify(releases));
++
++test('0.x beta and rc versions are updateable; debug, CI and malformed versions are not', () => {
++  for (const version of ['0.4.1-beta.1', 'v0.4.2-rc.1', '0.5.0']) assert.equal(isReleaseVersion(version), true);
++  for (const version of ['DEBUG_VERSION', '0.4.1-ci.2', 'latest', '0.4']) assert.equal(isReleaseVersion(version), false);
++});
++test('public release lookup needs no RID, CDK or token and selects exact package/digest', async () => {
++  const result = await checkGitHubUpdate(options, async (url) => {
++    assert.equal(url, 'https://api.github.com/repos/AnTiwwwwww/BJX-releases/releases?per_page=100');
++    return fetchReleases([release()])();
++  });
++  assert.equal(result.versionName, '0.4.2-beta.1');
++  assert.equal(result.sha256, hash);
++  assert.equal(result.releaseNote, 'Update notes');
++});
++test('semantic order, stable/beta channel, drafts, CI builds and downgrade protection', async () => {
++  const draft = { ...release('v2.0.0'), draft: true };
++  const releases = [release(), release('v0.4.10-beta.1'), release('v0.4.3'), draft, release('v3.0.0-ci.1')];
++  assert.equal((await checkGitHubUpdate(options, fetchReleases(releases))).versionName, '0.4.10-beta.1');
++  assert.equal((await checkGitHubUpdate({ ...options, channel: 'stable' }, fetchReleases(releases))).versionName, '0.4.3');
++  assert.equal((await checkGitHubUpdate({ ...options, currentVersion: '0.5.0' }, fetchReleases(releases))).hasUpdate, false);
++});
++test('no updates is a successful check, including empty/stable-only channel', async () => {
++  assert.equal((await checkGitHubUpdate(options, fetchReleases([]))).hasUpdate, false);
++  assert.equal((await checkGitHubUpdate({ ...options, channel: 'stable' }, fetchReleases([release()]))).hasUpdate, false);
++});
++test('never substitutes source zip, other architecture or arbitrary download URL', async () => {
++  for (const name of ['BJX-source-v0.4.2-beta.1.zip', 'BJX-win-arm64-v0.4.2-beta.1.zip']) {
++    const r = release(); r.assets[0].name = name;
++    await assert.rejects(checkGitHubUpdate(options, fetchReleases([r])));
++  }
++  const r = release(); r.assets[0].browser_download_url = 'https://example.com/update.zip';
++  await assert.rejects(checkGitHubUpdate(options, fetchReleases([r])));
++  await assert.rejects(checkGitHubUpdate({ ...options, os: 'linux' }, fetchReleases([release()])));
++});
++test('missing digest uses the exact .sha256 asset; filename and digest must match', async () => {
++  const r = release(); delete r.assets[0].digest;
++  r.assets.push({ ...r.assets[0], name: `${r.assets[0].name}.sha256`, browser_download_url: `${r.assets[0].browser_download_url}.sha256`, size: 100 });
++  for (const filename of [r.assets[0].name, 'wrong.zip']) {
++    const fetcher = async (url: string) => url.endsWith('.sha256') ? new Response(`${hash}  ${filename}\n`) : fetchReleases([r])();
++    if (filename === 'wrong.zip') await assert.rejects(checkGitHubUpdate(options, fetcher));
++    else assert.equal((await checkGitHubUpdate(options, fetcher)).sha256, hash);
++  }
++  r.assets.pop();
++  await assert.rejects(checkGitHubUpdate(options, fetchReleases([r])));
++});
++test('rate limits, network failure, invalid digest and repo URL fail closed', async () => {
++  for (const status of [403, 429, 500]) await assert.rejects(checkGitHubUpdate(options, async () => new Response('', { status })));
++  await assert.rejects(checkGitHubUpdate(options, async () => { throw new Error('offline'); }));
++  const r = release(); r.assets[0].digest = 'sha256:invalid';
++  await assert.rejects(checkGitHubUpdate(options, fetchReleases([r])));
++  await assert.rejects(checkGitHubUpdate({ ...options, githubUrl: 'https://github.com.evil.test/o/r' }, fetchReleases([r])));
++});

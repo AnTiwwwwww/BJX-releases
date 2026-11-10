@@ -22,7 +22,7 @@ jobs:
   windows:
     if: github.repository == 'AnTiwwwwww/BJX-releases'
     runs-on: windows-latest
-    timeout-minutes: 25
+    timeout-minutes: 90
     permissions:
       contents: write
     defaults:
@@ -30,6 +30,15 @@ jobs:
         shell: pwsh
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '22'
+      - name: Build verified BJX updater runtime
+        run: |
+          $ErrorActionPreference = 'Stop'
+          npm install --global pnpm@10.28.0
+          if ($LASTEXITCODE -ne 0) { throw 'pnpm install failed' }
+          ./tools/build-mxu.ps1
       - name: Validate version and build packages
         id: package
         env:
@@ -47,6 +56,8 @@ jobs:
           $package = ./tools/export-beta.ps1
           ./tools/test-release-package.ps1 -PackagePath $package.Path
           ./tools/export-source.ps1 -OutputFile (Join-Path $PWD "export/BJX-source-v$version.zip")
+          Copy-Item -LiteralPath 'build/mxu-patched/MXU-source-v2.8.0-bjx.1.zip' -Destination export
+          Copy-Item -LiteralPath 'build/mxu-patched/MXU-source-v2.8.0-bjx.1.zip.sha256' -Destination export
           "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
       - name: Upload verified build
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
