@@ -4,3 +4,5 @@
 /.archify/**/*.html whitespace=cr-at-eol,-blank-at-eol
 # 保留上游 LGPL 许可原文中的 Markdown 行尾换行标记。
 /licenses/MaaFramework-LGPL-3.0.txt whitespace=-blank-at-eol
+# Updater patch checksums bind exact bytes on Windows and Linux.
+/integrations/mxu/*.patch -text
