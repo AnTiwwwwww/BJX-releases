@@ -4,7 +4,7 @@
 
 公开仓库：<https://github.com/AnTiwwwwww/BJX-releases> · [下载内测整包](https://github.com/AnTiwwwwww/BJX-releases/releases)
 
-当前版本 `0.4.1-beta.1`，处于内测阶段。当前仅建议测试「单人吃鸡刷币」和「定时开始」，**吃鸡运行前请手动切换至旗舰心法，并关闭遮挡主界面的新手引导**。其余任务的名称与说明均标注「未完成」，新配置默认不勾选；已有配置会保留勾选状态，请手动取消未完成任务。给朋友的文件与使用步骤见 [内测说明](docs/beta-testing.md)。当前通过 Releases 手动下载更新，Mirror酱尚未接入，软件内自动更新未启用。
+当前版本 `0.4.2-beta.1`，处于内测阶段。当前仅建议测试「单人吃鸡刷币」和「定时开始」，**吃鸡运行前请手动切换至旗舰心法，并关闭遮挡主界面的新手引导**。其余任务的名称与说明均标注「未完成」，新配置默认不勾选；已有配置会保留勾选状态，请手动取消未完成任务。给朋友的文件与使用步骤见 [内测说明](docs/beta-testing.md)。本版起支持纯 GitHub 联网更新，无需 RID/CDK；旧版需先手动换包一次。使用方法和安装时机见 [GitHub 更新说明](docs/github-update.md)。
 
 ## 这一版做什么
 
@@ -29,11 +29,11 @@
 
 ## 运行
 
-先按 [安装与构建说明](docs/installation.md) 准备 PowerShell 7、MXU 2.8.0、MaaFramework 5.14.3 和中文 OCR v4。下载地址与校验值固定在 [依赖清单](docs/dependencies.json)。项目可放在任意有写权限的目录，日志和导出资料均随项目保存。
+先按 [安装与构建说明](docs/installation.md) 准备 PowerShell 7、BJX 定制 MXU 2.8.0-bjx.1、MaaFramework 5.14.3 和中文 OCR v4。下载地址与校验值固定在 [依赖清单](docs/dependencies.json)。项目可放在任意有写权限的目录，日志和导出资料均随项目保存。
 
 只有系统 PowerShell 5.1 时，任务启动前会弹出 PowerShell 7 安装指引；安装 7 后与 5.1 并存，无需卸载系统版本。已装 7 正常继续，并支持从标准安装目录定位尚未进入 PATH 的程序。
 
-1. 将 MXU 的 `mxu.exe` 放在本仓库根目录，将 MaaFramework 的 `bin` 全部内容放到 `maafw/`。
+1. 将 BJX 整包或按 `tools/build-mxu.ps1` 构建的 `mxu.exe` 放在本仓库根目录，将 MaaFramework 的 `bin` 全部内容放到 `maafw/`。
 2. 将同一套中文 OCR v4 的 `det.onnx`、`rec.onnx`、`keys.txt` 放进 `resource/model/ocr/`。执行 `pwsh -File tools/build.ps1`，关闭 BJX 后将 `build/tools/` 中的两个 EXE 复制到 `tools/`。
 3. 启动 `mxu.exe`。它读取同目录的 `interface.json`。首次安装 PowerShell 或调整 PATH 后重新打开 BJX。
 4. 游戏使用窗口模式、1920×1080、界面缩放 100%，先登录，再在界面里选中标题含「剑网3」的窗口。
@@ -59,8 +59,9 @@ BJX 默认 `Seize` 会激活游戏窗口，点击时移动真实鼠标。窗口�
 
 2026-11-10 增加主界面文字的备用识别区域，同时用于退出后的回城确认，故障画面回放通过。**新号主城问题的实机修复仍待确认**：本次恢复运行发生在用户手动关闭新手引导之后，不能据此认定新增识别已解决问题。引导开关在设置中的路径待补充，随后再验证新号启动和退出后回城。两组文字识别都要求「花萼楼」「行记」成对命中；未看到退出页时仍禁止重新匹配。
 
-- [单人吃鸡任务路线图](.archify/workflow-bjx-royale-route-20261110-162346/bjx-royale-route.html)（[预览图](.archify/workflow-bjx-royale-route-20261110-162346/visual-check/bjx-royale-route.visual-check.2048x1320.light.png)）
+- [单人吃鸡任务路线图](.archify/workflow-bjx-royale-route-20261110-173306/bjx-royale-route.html)（[预览图](.archify/workflow-bjx-royale-route-20261110-173306/visual-check/bjx-royale-route.visual-check.2048x1320.light.png)）
 - [架构取舍](docs/architecture.md)
+- [GitHub 联网更新](docs/github-update.md)
 - [朋友内测与打包](docs/beta-testing.md)
 - [安装与构建](docs/installation.md)
 - [公开源码包与隐私范围](docs/publishing.md)

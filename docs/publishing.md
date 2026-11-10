@@ -33,31 +33,21 @@ pwsh -NoLogo -NoProfile -File ./tools/export-source.ps1
 ```powershell
 pwsh -NoLogo -NoProfile -File ./tools/download-dependencies.ps1
 pwsh -NoLogo -NoProfile -File ./tools/test-source-package.ps1
+pwsh -NoLogo -NoProfile -File ./tools/build-mxu.ps1
 pwsh -NoLogo -NoProfile -File ./tools/test-update-gate.ps1
 $package = ./tools/export-beta.ps1
 ./tools/test-release-package.ps1 -PackagePath $package.Path
 ```
 
-`test-release-package.ps1` 在隔离目录检查逐文件哈希、私有资料排除、MXU 启动与截止计时，再模拟 MXU 2.8.0 的顶层替换规则，确认虚构账号和配置逐字节保留、旧任务文件清除。`test-update-gate.ps1` 校验固定版 MXU 源文件哈希并执行其中真实的自动安装条件，覆盖任务运行、等待启动、下载未完成等状态。它们不操作正在运行的 BJX，也不代替软件内下载、安装和重启验收。
+`test-release-package.ps1` 在隔离目录检查逐文件哈希、私有资料排除、MXU 启动与截止计时，再模拟 MXU 2.8.0 的顶层替换规则，确认虚构账号和配置逐字节保留、旧任务文件清除。`test-update-gate.ps1` 校验定制 MXU 源文件哈希并执行其中真实的自动安装条件，覆盖任务运行、等待启动、下载未完成等状态。它们不操作正在运行的 BJX，也不代替软件内下载、安装和重启验收。
 
-目前未接入 Mirror酱，`interface.json` 未配置 RID，0.x 版本也不启用 MXU 常规更新检查。当前用户通过 Releases 手动更新；后续接入需要独立完成服务注册、版本策略和端到端验收。
+## GitHub 联网更新
 
-## 联网升级接入计划
+使用纯 GitHub 渠道，不注册 MirrorChyan 项目。定制 MXU 读取公开 Releases 列表并按频道筛选版本；用户无需 Token 或 CDK。功能边界、首次迁移与失败处理见 [GitHub 更新说明](github-update.md)。
 
-优先复用 MXU 的内置更新器。现有公开仓库、Windows 整包、SHA-256 和标签发布工作流已经具备；下一步为 Mirror酱 项目接入和真实旧版本升级验收。接入前继续标为手动更新，不填虚构 RID，也不把离线模拟记作联网验收通过。
+CI 先按 `integrations/mxu/build.json` 固定的上游提交和补丁构建 MXU 2.8.0-bjx.1，执行前端测试、类型检查、Rust 哈希/安装门禁/文件保留测试。程序包只接受校验匹配的定制构建回执，不能静默退回上游原版 MXU。原版 ZIP 用于核对上游来源并保留许可。
 
-1. 由项目负责人联系 [Mirror酱 项目接入](https://github.com/MirrorChyan/docs#开始接入)，提供 `AnTiwwwwww/BJX-releases` 仓库及 `v0.4.1-beta.1` 的程序 ZIP。当前只分发 Windows x64 的 MXU 整包，计划先使用 beta 通道。官方会确认 RID、平台划分、上传与日志同步方案，并提供接入 PR 或交付说明。
-2. 收到官方信息后，在公开仓库的 `Settings → Secrets and variables → Actions` 设置 `MirrorChyanUploadToken`。这是 CI 上传凭证，用户下载使用的 CDK 是另一种凭证；Token 无需发送到聊天或写入源码。配置路径见 [官方 FAQ](https://github.com/MirrorChyan/docs/blob/main/FAQ.md#如何设置仓库的-mirrorchyanuploadtoken)。
-3. 审核接入 PR，将确认后的 RID 与平台设置接到 `interface.json`，使包版本、Git 标签、服务端版本和 beta 通道一致。现有 CI 只验证和发布 GitHub Release，需依据接入方案增加上传及更新日志同步；不要假定 `GITHUB_TOKEN` 创建 Release 会自动触发另一条 `release` 工作流，应实际验证触发链路。
-4. 处理当前 MXU 2.8.0 的版本限制：其 [`isDebugVersion`](https://github.com/MaaXYZ/MXU/blob/v2.8.0/src/services/updateService.ts#L403) 会过滤低于 `1.0.0` 的版本，`1.0.0-beta.1` 也在过滤范围。可使用高于该门槛的 beta 版本（例如 `1.0.1-beta.1`，仍明确标注内测），或保留 0.x 并维护支持该版本规则的 MXU 构建。应在接入时确定并验证方案，不能单靠添加 RID 启用当前包的更新。
-5. 发出首次接入包。现有 `0.4.1-beta.1` 未包含 RID，用户需要手动换包一次；接入包验收后，后续版本才通过软件联网检查、下载和安装。
-6. 在隔离的旧版目录验证整个过程：能发现目标 beta 版本，选中正确 Windows x64 包，下载和校验通过；任务运行或定时等待时不安装重启；停止后可以完成安装并重启；`config/` 与 `accounts.csv` 保留；再次检查不重复提示同一版本；断网或下载失败时现有任务仍可使用。先验证完整包，增量包另行验收。
-
-用户不填 CDK 也能查版本；MXU 2.8.0 在版本接口成功且无 CDK 时可从 GitHub 下载。Mirror酱 加速下载需要有效 CDK。该版本仍依赖 Mirror酱 查询版本，不能把 GitHub 下载路径理解为服务不可用时必定能自动查到新版本。[官方说明](https://github.com/MirrorChyan/docs/blob/main/FAQ.md#不填-cdk也能检查更新吗)，[MXU 下载源选择](https://github.com/MaaXYZ/MXU/blob/v2.8.0/src/services/updateService.ts#L872)。
-
-首次沟通可使用下面的项目信息，不含任何凭证：
-
-> 项目 BJX，公开仓库 https://github.com/AnTiwwwwww/BJX-releases 。使用 MXU 2.8.0，已有 Windows x64 ZIP 整包和 GitHub Actions 标签发布流程。申请接入版本检查及更新包分发，先使用 beta 通道，保留无 CDK 时从 GitHub 下载。当前 Release 为 v0.4.1-beta.1，要分发的文件为 BJX-win-x86_64-v0.4.1-beta.1.zip，源码 ZIP 不作为客户端更新包。希望确认 RID、平台和版本命名，并提供上传、更新日志同步及请求示例。
+Release 除 BJX 程序 ZIP 与源码 ZIP 外，还提供 `MXU-source-v2.8.0-bjx.1.zip` 及 SHA-256，包含完整对应源码、锁文件和测试。MXU 及补丁按 AGPL-3.0 分发。安装保护的自动测试与真实用户升级验收分别记录在 [升级验收](update-validation.md)。
 
 ## 路线图公开验证记录
 

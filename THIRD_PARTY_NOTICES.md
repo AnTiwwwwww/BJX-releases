@@ -5,7 +5,7 @@ BJX 自有代码和文档适用根目录的 [MIT 许可证](LICENSE)。第三方
 | 项目 | 版本或来源 | 许可与本地副本 | 在 BJX 中的用途 |
 | --- | --- | --- | --- |
 | [MaaFramework](https://github.com/MaaXYZ/MaaFramework/tree/v5.14.3) | 5.14.3 | [LGPL-3.0](licenses/MaaFramework-LGPL-3.0.txt)，及其引用的 [GPL-3.0](licenses/GPL-3.0.txt) | 用户另行下载运行库；BJX 的 C# Agent 通过公开动态库接口调用 |
-| [MXU](https://github.com/MaaXYZ/MXU/tree/v2.8.0) | 2.8.0 | [AGPL-3.0](licenses/MXU-AGPL-3.0.txt) | 用户另行下载的任务界面，BJX 提供资源包配置 |
+| [MXU](https://github.com/MaaXYZ/MXU/tree/v2.8.0) | 2.8.0-bjx.1 | [AGPL-3.0](licenses/MXU-AGPL-3.0.txt) | 基于固定上游源码的任务界面，含 [BJX 更新补丁与构建方法](integrations/mxu/README.md)；Release 同时提供完整对应源码 |
 | [MaaCommonAssets](https://github.com/MaaXYZ/MaaCommonAssets/tree/dabcd4681ac990dc4361de26416d986abd80e4aa) | `ppocr_v4/zh_cn`，固定版本见 `docs/dependencies.json` | 资源仓库 [MIT](licenses/MaaCommonAssets-MIT.txt) | OCR 模型整理与转换来源；模型由用户另行下载 |
 | [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR/tree/release/2.7) | PP-OCRv4；来源由 MaaCommonAssets 的模型 README 说明 | 上游项目 [Apache-2.0](licenses/PaddleOCR-Apache-2.0.txt) | OCR 模型的原始上游；模型及附带资料应保留相应上游声明 |
 | [Archify](https://github.com/tt-a1i/archify) | 3.0.1 | [MIT](licenses/Archify-MIT.txt)，包含 tt-a1i 和 Cocoon AI 的版权声明 | 路线图的 HTML 模板和查看器代码 |

@@ -20,6 +20,7 @@ $runtimeRoot = [IO.Path]::GetFullPath($PatchedRuntimeDirectory)
 $runtimeRecipe = Get-Content -LiteralPath (Join-Path $projectRoot 'integrations/mxu/build.json') -Raw | ConvertFrom-Json
 $runtimeReceipt = Get-Content -LiteralPath (Join-Path $runtimeRoot 'build-receipt.json') -Raw | ConvertFrom-Json
 if ($runtimeReceipt.patch_sha256 -ne $runtimeRecipe.patch_sha256 -or
+    (Get-FileHash -LiteralPath (Join-Path $projectRoot 'integrations/mxu/github-update.patch') -Algorithm SHA256).Hash -ne $runtimeRecipe.patch_sha256 -or
     $runtimeReceipt.revision -ne $runtimeRecipe.revision -or
     $runtimeReceipt.runtime_version -ne $runtimeRecipe.runtime_version -or
     (Get-FileHash -LiteralPath (Join-Path $runtimeRoot 'mxu.exe') -Algorithm SHA256).Hash -ne $runtimeReceipt.exe_sha256) {

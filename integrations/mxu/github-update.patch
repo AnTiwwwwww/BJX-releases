@@ -783,6 +783,64 @@ index 0931274..94f9d7b 100644
  };
  
  // 默认截图帧率
+diff --git a/tests/githubInstall.test.ts b/tests/githubInstall.test.ts
+new file mode 100644
+index 0000000..89b5afc
+--- /dev/null
++++ b/tests/githubInstall.test.ts
+@@ -0,0 +1,52 @@
++import assert from 'node:assert/strict';
++import test from 'node:test';
++import { readFileSync } from 'node:fs';
++import vm from 'node:vm';
++import ts from 'typescript';
++
++// Exercise the real installUpdate entry point, with native I/O mocked at its boundary.
++const source = readFileSync(new URL('../src/services/updateService.ts', import.meta.url), 'utf8');
++const ast = ts.createSourceFile('updateService.ts', source, ts.ScriptTarget.Latest, true);
++const declaration = ast.statements.find((s) => ts.isFunctionDeclaration(s) && s.name?.text === 'installUpdate')!;
++const body = ts.transpile(declaration.getText(ast).replace(/^export /, ''), { target: ts.ScriptTarget.ES2022 });
++function harness(change?: (command: string, state: { instances: { isRunning: boolean }[] }) => void) {
++  const state = { instances: [{ isRunning: false }], projectInterface: { github: 'https://github.com/AnTiwwwwww/BJX-releases' } };
++  const calls: string[] = [];
++  const install = vm.runInNewContext(`let isInstalling = false; ${body}; installUpdate`, {
++    useAppStore: { getState: () => state },
++    i18n: { t: (key: string) => key },
++    log: { info() {}, warn() {}, error() {} },
++    invoke: async (command: string) => { calls.push(command); change?.(command, state); return null; },
++    backupConfigBeforeUpdate: async () => { calls.push('backup'); },
++    isExecutableInstaller: () => false,
++    dirname: async () => 'cache', joinPath: (...parts: string[]) => parts.join('/'),
++    getCacheDir: async () => 'cache', moveToOldFolder: async () => {},
++  });
++  return { state, calls, install: () => install({ zipPath: 'cache/update.zip', targetDir: 'BJX', newVersion: '0.4.2-beta.1', sha256: 'a'.repeat(64) }) };
++}
++test('manual install refuses running tasks before any native call or file mutation', async () => {
++  const h = harness(); h.state.instances[0].isRunning = true;
++  await assert.rejects(h.install(), /tasksRunning/);
++  assert.deepEqual(h.calls, []);
++});
++test('a task starting during hash verification also prevents installation', async () => {
++  const h = harness((cmd, state) => { if (cmd === 'verify_update_sha256') state.instances[0].isRunning = true; });
++  await assert.rejects(h.install(), /tasksRunning/);
++  assert.deepEqual(h.calls, ['verify_update_sha256']);
++});
++test('corrupt package and busy backend never reach extraction or backup', async () => {
++  for (const blocked of ['verify_update_sha256', 'bjx_begin_update']) {
++    const h = harness((cmd) => { if (cmd === blocked) throw new Error('rejected'); });
++    await assert.rejects(h.install());
++    assert.equal(h.calls.includes('backup'), false);
++    assert.equal(h.calls.includes('extract_zip'), false);
++    assert.equal(h.calls.includes('apply_full_update'), false);
++  }
++});
++test('successful install verifies first, acquires native gate, then applies and keeps gate until restart', async () => {
++  const h = harness();
++  assert.equal(await h.install(), true);
++  assert.deepEqual(h.calls.slice(0, 3), ['verify_update_sha256', 'bjx_begin_update', 'backup']);
++  assert.equal(h.calls.includes('apply_full_update'), true);
++  assert.equal(h.calls.includes('bjx_end_update'), false);
++});
 diff --git a/tests/githubUpdate.test.ts b/tests/githubUpdate.test.ts
 new file mode 100644
 index 0000000..664704c

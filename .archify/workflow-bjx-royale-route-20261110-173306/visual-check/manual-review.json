@@ -1,0 +1,14 @@
+{
+  "review_type": "image-inspection",
+  "status": "pass",
+  "artifact_sha256": "0ee77b2c29ad180757655a6bd9649217f124e1dddc01330acdf5d79cb5002871",
+  "inspected_screenshots": [
+    "bjx-royale-route.visual-check.2048x1320.light.png",
+    "bjx-royale-route.visual-check.1440x900.dark.png"
+  ],
+  "observations": [
+    "新增 GitHub 检查、下载校验、等待任务停止、安装和重启分支清晰，失败分支没有穿过节点。",
+    "明暗预览中主流程、退出后重排、零额度及次日截止箭头可区分。1440 视口底部及补充卡片需滚动查看；目视检查覆盖截图内流程。"
+  ],
+  "correction_rounds": 4
+}

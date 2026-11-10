@@ -33,6 +33,14 @@ jobs:
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '22'
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            build/mxu-runtime/src-tauri/target
+          key: mxu-windows-2.8.0-${{ hashFiles('integrations/mxu/github-update.patch') }}
+          restore-keys: mxu-windows-2.8.0-
       - name: Build verified BJX updater runtime
         run: |
           $ErrorActionPreference = 'Stop'

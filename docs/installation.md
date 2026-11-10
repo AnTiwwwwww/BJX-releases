@@ -6,7 +6,7 @@ BJX 是 Windows x64 项目。以下组合用于当前版本验证，升级依赖
 | --- | --- | --- |
 | PowerShell | 7（本机 7.6.9） | 执行任务辅助脚本，支持 PATH 或标准安装目录 |
 | .NET Framework | 4.x，使用系统 `Framework64/v4.0.30319/csc.exe` | 构建和运行自有 C# 辅助程序 |
-| [MXU](https://github.com/MaaXYZ/MXU/releases/tag/v2.8.0) | 2.8.0 Windows x86_64 | 任务界面 |
+| [MXU](https://github.com/MaaXYZ/MXU/releases/tag/v2.8.0) | 2.8.0-bjx.1 Windows x86_64 | 任务界面与 GitHub 更新 |
 | [MaaFramework](https://github.com/MaaXYZ/MaaFramework/releases/tag/v5.14.3) | 5.14.3 Windows x86_64 | 识别、控制器与自定义动作 |
 | [MaaCommonAssets](https://github.com/MaaXYZ/MaaCommonAssets/tree/dabcd4681ac990dc4361de26416d986abd80e4aa/OCR/ppocr_v4/zh_cn) | `ppocr_v4/zh_cn`，固定版本见依赖清单 | 中文 OCR |
 
@@ -47,7 +47,7 @@ foreach ($asset in $manifest.assets) {
 
 关闭 BJX 后，完成以下文件放置：
 
-1. 解压 MXU 压缩包，将其中的 `mxu.exe` 放到 BJX 根目录。保留上游许可文件，不覆盖 BJX 自己的 `LICENSE`。
+1. 使用 BJX Release 整包的 `mxu.exe`，或安装 Node.js 22、pnpm 10.28.0、Rust stable 与 Visual Studio C++ 构建工具后执行 `./tools/build-mxu.ps1`，复制 `build/mxu-patched/mxu.exe` 到根目录。上游原版 MXU 不含本项目的 GitHub 更新补丁。保留上游许可，详见 `integrations/mxu/README.md`。
 2. 解压 MaaFramework 压缩包，将其中 **`bin` 的全部内容** 放到 BJX 的 `maafw/`。不只复制单个 DLL，也不混用不同版本。
 3. 创建 `resource/model/ocr/`，将 `deps/det.onnx`、`deps/rec.onnx`、`deps/keys.txt` 复制进去，三个文件必须来自同一套中文 OCR v4 模型。
 

@@ -1,0 +1,929 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "BJX 单人吃鸡任务路线图",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "output": ".archify/workflow-bjx-royale-route-20261110-173306/bjx-royale-route.html",
+    "repository": {
+      "url": "https://github.com/AnTiwwwwww/BJX.git",
+      "revision": "2f0ac260973054c466cc80d1c1da892ae6963f80",
+      "link_mode": "local-only"
+    },
+    "legend": {
+      "mode": "auto",
+      "entries": {
+        "frontend": {
+          "label": "游戏画面与点击"
+        },
+        "backend": {
+          "label": "键盘操作与流程"
+        },
+        "messagebus": {
+          "label": "等待"
+        },
+        "security": {
+          "label": "判定与结束条件"
+        },
+        "external": {
+          "label": "未完成的结束后操作"
+        }
+      }
+    }
+  },
+  "lanes": [
+    {
+      "id": "updates",
+      "label": "可选：GitHub 更新检查"
+    },
+    {
+      "id": "update-install",
+      "label": "更新安装与重启"
+    },
+    {
+      "label": "启动环境检查",
+      "id": "environment"
+    },
+    {
+      "id": "opening",
+      "label": "打开吃鸡界面"
+    },
+    {
+      "id": "matching",
+      "label": "提交匹配与确认进局"
+    },
+    {
+      "id": "battle",
+      "label": "局内与结算"
+    },
+    {
+      "id": "returning",
+      "label": "回城与下一局"
+    },
+    {
+      "id": "ending",
+      "label": "任务结束"
+    }
+  ],
+  "nodes": [
+    {
+      "id": "update-check",
+      "lane": "updates",
+      "col": 0,
+      "type": "backend",
+      "label": "检查 GitHub 新版",
+      "sublabel": "启动／设置，稳定或内测",
+      "width": 176,
+      "sources": [
+        {
+          "path": "build/mxu-bjx/src/services/githubUpdate.ts",
+          "line": 28,
+          "end_line": 60,
+          "label": "公开 Release 与版本频道筛选"
+        },
+        {
+          "path": "build/mxu-bjx/src/App.tsx",
+          "line": 1060,
+          "end_line": 1103,
+          "label": "启动时检查与下载"
+        },
+        {
+          "path": "build/mxu-bjx/src/types/config.ts",
+          "line": 202,
+          "end_line": 206,
+          "label": "新配置默认内测频道"
+        }
+      ]
+    },
+    {
+      "id": "update-download",
+      "lane": "updates",
+      "col": 1,
+      "type": "security",
+      "label": "下载并校验整包",
+      "sublabel": "Windows x64，SHA-256",
+      "width": 176,
+      "sources": [
+        {
+          "path": "build/mxu-bjx/src/services/githubUpdate.ts",
+          "line": 60,
+          "end_line": 89,
+          "label": "精确整包和校验值"
+        },
+        {
+          "path": "build/mxu-bjx/src/services/updateService.ts",
+          "line": 830,
+          "end_line": 842,
+          "label": "下载后校验并保存待安装信息"
+        }
+      ]
+    },
+    {
+      "id": "update-wait",
+      "lane": "updates",
+      "col": 2,
+      "type": "messagebus",
+      "label": "等待所有任务停止",
+      "sublabel": "包括定时等待与即将启动的任务",
+      "width": 192,
+      "sources": [
+        {
+          "path": "build/mxu-bjx/src/App.tsx",
+          "line": 415,
+          "end_line": 437,
+          "label": "下载完成且任务全停才触发自动安装"
+        },
+        {
+          "path": "build/mxu-bjx/src/services/updateService.ts",
+          "line": 1010,
+          "end_line": 1041,
+          "label": "手动安装也检查，校验后再次检查"
+        }
+      ]
+    },
+    {
+      "id": "update-failed",
+      "lane": "update-install",
+      "col": 0,
+      "type": "security",
+      "label": "本次不安装／报错",
+      "sublabel": "无新版或失败，可重试",
+      "width": 176,
+      "sources": [
+        {
+          "path": "build/mxu-bjx/src/services/githubUpdate.ts",
+          "line": 40,
+          "end_line": 89,
+          "label": "无新版和异常分支"
+        },
+        {
+          "path": "build/mxu-bjx/src/services/updateService.ts",
+          "line": 846,
+          "end_line": 867,
+          "label": "下载失败不设置完成"
+        },
+        {
+          "path": "build/mxu-bjx/src/services/updateService.ts",
+          "line": 1128,
+          "end_line": 1172,
+          "label": "安装失败提示与恢复目录"
+        }
+      ]
+    },
+    {
+      "id": "update-install",
+      "lane": "update-install",
+      "col": 2,
+      "type": "security",
+      "label": "安装并阻止新任务",
+      "sublabel": "再次校验，保留账号与配置",
+      "width": 192,
+      "sources": [
+        {
+          "path": "build/mxu-bjx/src/services/updateService.ts",
+          "line": 1026,
+          "end_line": 1042,
+          "label": "安装前再次校验与取得底层门禁"
+        },
+        {
+          "path": "build/mxu-bjx/src-tauri/src/commands/bjx_update.rs",
+          "line": 8,
+          "end_line": 27,
+          "label": "底层任务状态与更新互斥"
+        },
+        {
+          "path": "build/mxu-bjx/src-tauri/src/commands/update.rs",
+          "line": 296,
+          "end_line": 358,
+          "label": "整包替换跳过用户数据"
+        }
+      ]
+    },
+    {
+      "id": "update-restart",
+      "lane": "update-install",
+      "col": 3,
+      "type": "backend",
+      "label": "安装完成后重启",
+      "sublabel": "新版本接手后可启动任务",
+      "width": 176,
+      "sources": [
+        {
+          "path": "build/mxu-bjx/src/components/InstallConfirmModal.tsx",
+          "line": 99,
+          "end_line": 114,
+          "label": "记录版本并重启"
+        },
+        {
+          "path": "build/mxu-bjx/src/components/InstallConfirmModal.tsx",
+          "line": 243,
+          "end_line": 265,
+          "label": "ZIP 安装成功自动重启"
+        },
+        {
+          "path": "build/mxu-bjx/src-tauri/src/commands/maa_core.rs",
+          "line": 1308,
+          "end_line": 1321,
+          "label": "安装期间禁止从任何入口启动任务"
+        }
+      ]
+    },
+    {
+      "label": "检查 PowerShell 7",
+      "type": "security",
+      "sources": [
+        {
+          "end_line": 54,
+          "line": 12,
+          "path": "tools/bjx-powershell.cs",
+          "label": "检测 PowerShell 7，缺失时弹出指引"
+        },
+        {
+          "end_line": 30,
+          "line": 20,
+          "path": "tools/bjx-royale-clock.cs",
+          "label": "Agent 连接前检查，缺失返回失败"
+        }
+      ],
+      "col": 0,
+      "id": "powershell",
+      "width": 168,
+      "sublabel": "PATH 或标准安装目录",
+      "lane": "environment"
+    },
+    {
+      "label": "弹出安装指引",
+      "type": "security",
+      "sources": [
+        {
+          "end_line": 89,
+          "line": 68,
+          "path": "tools/bjx-powershell.cs",
+          "label": "5.1 检测与安装指引内容"
+        },
+        {
+          "end_line": 28,
+          "line": 26,
+          "path": "tools/bjx-royale-clock.cs",
+          "label": "检查不通过则退出"
+        }
+      ],
+      "col": 2,
+      "id": "install-guide",
+      "width": 192,
+      "sublabel": "本次启动停止，安装后重开 BJX",
+      "lane": "environment"
+    },
+    {
+      "id": "home",
+      "lane": "opening",
+      "col": 0,
+      "type": "backend",
+      "label": "主界面／沧海集",
+      "sublabel": "按 Ctrl+L 打开绝境",
+      "width": 154,
+      "sources": [
+        {
+          "path": "resource/pipeline/solo_royale.json",
+          "line": 42,
+          "end_line": 96,
+          "label": "主城地图或顶部成对文字，含浅色备用区域"
+        },
+        {
+          "path": "resource/pipeline/solo_royale.json",
+          "line": 161,
+          "end_line": 194,
+          "label": "按下 Ctrl+L"
+        },
+        {
+          "end_line": 10,
+          "label": "内测范围与手动切换旗舰心法提示",
+          "line": 9,
+          "path": "interface.json"
+        }
+      ],
+      "icon": "start"
+    },
+    {
+      "id": "panel",
+      "lane": "opening",
+      "col": 1,
+      "type": "frontend",
+      "label": "绝境战场",
+      "sublabel": "点击左侧「单人模式」",
+      "width": 163,
+      "sources": [
+        {
+          "path": "resource/pipeline/solo_royale.json",
+          "line": 231,
+          "end_line": 289,
+          "label": "判断面板并点击单人模式"
+        }
+      ]
+    },
+    {
+      "id": "quota",
+      "lane": "opening",
+      "col": 2,
+      "type": "security",
+      "label": "龙门绝境",
+      "sublabel": "读底部「本周还可获得飞沙令」",
+      "width": 178,
+      "sources": [
+        {
+          "path": "resource/pipeline/solo_royale.json",
+          "line": 290,
+          "end_line": 344,
+          "label": "确认单人页并检查飞沙令"
+        },
+        {
+          "label": "额度记录随项目保存在 debug 目录",
+          "path": "tools/record-royale-left.ps1",
+          "line": 14,
+          "end_line": 28
+        },
+        {
+          "label": "任务日志相对项目定位",
+          "path": "tools/bjx-log.ps1",
+          "line": 2,
+          "end_line": 12
+        }
+      ]
+    },
+    {
+      "id": "zero",
+      "lane": "opening",
+      "col": 3,
+      "type": "security",
+      "label": "再次确认额度为 0",
+      "sublabel": "记录额度，按 Esc 关面板",
+      "width": 160,
+      "sources": [
+        {
+          "path": "resource/pipeline/solo_royale.json",
+          "line": 757,
+          "end_line": 806,
+          "label": "双次零额度确认与关面板"
+        }
+      ]
+    },
+    {
+      "id": "match",
+      "lane": "matching",
+      "col": 2,
+      "type": "frontend",
+      "label": "点「个人匹配」",
+      "sublabel": "按钮在面板右下方",
+      "width": 158,
+      "sources": [
+        {
+          "path": "resource/pipeline/solo_royale.json",
+          "line": 333,
+          "end_line": 373,
+          "label": "仍有额度才提交个人匹配"
+        }
+      ]
+    },
+    {
+      "id": "queue",
+      "lane": "matching",
+      "col": 1,
+      "type": "messagebus",
+      "label": "排队等待",
+      "sublabel": "出现「取消匹配」或「预计排队」",
+      "width": 176,
+      "sources": [
+        {
+          "path": "resource/pipeline/solo_royale.json",
+          "line": 400,
+          "end_line": 480,
+          "label": "识别排队状态与连续复核"
+        }
+      ],
+      "icon": "waiting"
+    },
+    {
+      "id": "entered",
+      "lane": "matching",
+      "col": 0,
+      "type": "security",
+      "label": "确认已进局",
+      "sublabel": "右上角出现剩余人数",
+      "width": 157,
+      "sources": [
+        {
+          "path": "resource/pipeline/solo_royale.json",
+          "line": 141,
+          "end_line": 150,
+          "label": "识别局内剩余人数"
+        },
+        {
+          "path": "resource/pipeline/solo_royale.json",
+          "line": 481,
+          "end_line": 519,
+          "label": "等待局内画面"
+        }
+      ]
+    },
+    {
+      "id": "play",
+      "lane": "battle",
+      "col": 0,
+      "type": "backend",
+      "label": "局内按数字键 1",
+      "sublabel": "约每 10 秒一次，按前看结算",
+      "width": 172,
+      "sources": [
+        {
+          "path": "resource/pipeline/solo_royale.json",
+          "line": 520,
+          "end_line": 639,
+          "label": "局内确认、按键与间隔"
+        },
+        {
+          "path": "tools/royale-shift-c.ps1",
+          "line": 34,
+          "end_line": 47,
+          "label": "进局满十分钟检查"
+        },
+        {
+          "path": "tools/royale-shift-c.ps1",
+          "line": 80,
+          "end_line": 87,
+          "label": "游戏在前台才按一次 Shift+C"
+        }
+      ],
+      "icon": "active",
+      "tag": "满十分钟检查 Shift+C"
+    },
+    {
+      "id": "settlement",
+      "lane": "battle",
+      "col": 2,
+      "type": "security",
+      "label": "识别结算／退出提示",
+      "sublabel": "下一步／传出战场／退出战场",
+      "width": 179,
+      "sources": [
+        {
+          "path": "resource/pipeline/solo_royale.json",
+          "line": 640,
+          "end_line": 660,
+          "label": "识别右下角结算或退出文字"
+        }
+      ]
+    },
+    {
+      "id": "loading",
+      "lane": "returning",
+      "col": 2,
+      "type": "messagebus",
+      "label": "等待加载",
+      "sublabel": "先等 2 分钟",
+      "width": 147,
+      "sources": [
+        {
+          "path": "resource/pipeline/solo_royale.json",
+          "line": 661,
+          "end_line": 684,
+          "label": "两分钟加载等待"
+        }
+      ],
+      "icon": "clock"
+    },
+    {
+      "id": "town",
+      "lane": "returning",
+      "col": 1,
+      "type": "security",
+      "label": "确认已回到主界面",
+      "sublabel": "沧海集，或花萼楼＋行记",
+      "width": 172,
+      "sources": [
+        {
+          "path": "resource/pipeline/solo_royale.json",
+          "line": 671,
+          "end_line": 739,
+          "label": "退出后按地图或成对文字确认主界面，含备用区域"
+        }
+      ]
+    },
+    {
+      "id": "again",
+      "lane": "returning",
+      "col": 0,
+      "type": "backend",
+      "label": "再来一局",
+      "sublabel": "回到主界面入口",
+      "width": 154,
+      "sources": [
+        {
+          "path": "resource/pipeline/solo_royale.json",
+          "line": 728,
+          "end_line": 748,
+          "label": "回城后才回到入口"
+        },
+        {
+          "path": "interface.json",
+          "line": 536,
+          "end_line": 578,
+          "label": "局数选项决定能否再开"
+        }
+      ]
+    },
+    {
+      "id": "cutoff",
+      "lane": "ending",
+      "col": 4,
+      "type": "security",
+      "label": "运行截止时间",
+      "sublabel": "默认次日凌晨 01:30",
+      "width": 150,
+      "sources": [
+        {
+          "path": "interface.json",
+          "line": 515,
+          "end_line": 535,
+          "label": "截止时间选项和默认值"
+        },
+        {
+          "path": "tools/bjx-royale-clock.cs",
+          "line": 51,
+          "end_line": 100,
+          "label": "启动时确定截止，运行中检查"
+        },
+        {
+          "path": "resource/pipeline/solo_royale.json",
+          "line": 749,
+          "end_line": 756,
+          "label": "到点进入正常完成"
+        }
+      ],
+      "icon": "clock",
+      "yOffset": -48
+    },
+    {
+      "id": "done",
+      "lane": "ending",
+      "col": 3,
+      "type": "backend",
+      "label": "结束吃鸡任务",
+      "sublabel": "发送任务完成通知",
+      "width": 158,
+      "sources": [
+        {
+          "path": "resource/pipeline/solo_royale.json",
+          "line": 749,
+          "end_line": 756,
+          "label": "到点结束节点"
+        },
+        {
+          "path": "resource/pipeline/popup.json",
+          "line": 58,
+          "end_line": 73,
+          "label": "完成通知"
+        }
+      ],
+      "icon": "success",
+      "yOffset": -48
+    },
+    {
+      "id": "after",
+      "lane": "ending",
+      "col": 3,
+      "type": "external",
+      "label": "结束后操作（未完成）",
+      "sublabel": "可选关闭程序／关机",
+      "width": 174,
+      "sources": [
+        {
+          "path": "interface.json",
+          "line": 140,
+          "end_line": 187,
+          "label": "结束后操作及可选动作"
+        },
+        {
+          "path": "tools/after-run.ps1",
+          "line": 6,
+          "end_line": 34,
+          "label": "核对任务顺序与成功状态"
+        },
+        {
+          "path": "tools/after-run.ps1",
+          "line": 83,
+          "end_line": 96,
+          "label": "关闭无界或正常关机"
+        }
+      ],
+      "icon": "flag",
+      "yOffset": 48
+    }
+  ],
+  "edges": [
+    {
+      "id": "update-found",
+      "from": "update-check",
+      "to": "update-download",
+      "label": "新版",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "id": "update-ready",
+      "from": "update-download",
+      "to": "update-wait",
+      "label": "通过",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "id": "update-not-found",
+      "from": "update-check",
+      "to": "update-failed",
+      "label": "无新版／失败",
+      "variant": "security",
+      "role": "branch",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "update-bad-download",
+      "from": "update-download",
+      "to": "update-failed",
+      "label": "下载／校验失败",
+      "variant": "security",
+      "role": "branch",
+      "fromSide": "bottom",
+      "toSide": "right"
+    },
+    {
+      "id": "update-idle",
+      "from": "update-wait",
+      "to": "update-install",
+      "label": "全部停止",
+      "variant": "emphasis",
+      "role": "main",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "update-install-failed",
+      "from": "update-install",
+      "to": "update-failed",
+      "label": "校验／安装失败",
+      "variant": "security",
+      "role": "branch",
+      "fromSide": "left",
+      "toSide": "bottom"
+    },
+    {
+      "id": "update-done",
+      "from": "update-install",
+      "to": "update-restart",
+      "label": "成功",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "from": "powershell",
+      "variant": "emphasis",
+      "label": "已安装 7",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "id": "environment-ready",
+      "role": "main",
+      "to": "home"
+    },
+    {
+      "from": "powershell",
+      "variant": "security",
+      "label": "缺少 7",
+      "fromSide": "right",
+      "toSide": "left",
+      "id": "environment-missing",
+      "role": "branch",
+      "to": "install-guide"
+    },
+    {
+      "id": "home-panel",
+      "from": "home",
+      "to": "panel",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "id": "panel-quota",
+      "from": "panel",
+      "to": "quota",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "id": "quota-zero",
+      "from": "quota",
+      "to": "zero",
+      "variant": "security",
+      "role": "branch",
+      "label": "读到 0"
+    },
+    {
+      "id": "quota-match",
+      "from": "quota",
+      "to": "match",
+      "variant": "emphasis",
+      "role": "main",
+      "label": "仍有额度"
+    },
+    {
+      "id": "match-queue",
+      "from": "match",
+      "to": "queue",
+      "variant": "emphasis",
+      "role": "main",
+      "label": "已提交"
+    },
+    {
+      "id": "queue-entered",
+      "from": "queue",
+      "to": "entered",
+      "variant": "emphasis",
+      "role": "main",
+      "label": "三次未见"
+    },
+    {
+      "id": "entered-play",
+      "from": "entered",
+      "to": "play",
+      "variant": "emphasis",
+      "role": "main",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "play-settlement",
+      "from": "play",
+      "to": "settlement",
+      "variant": "emphasis",
+      "role": "main",
+      "label": "看到右下角提示",
+      "fromSide": "right",
+      "toSide": "left"
+    },
+    {
+      "id": "settlement-loading",
+      "from": "settlement",
+      "to": "loading",
+      "variant": "emphasis",
+      "role": "main",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "loading-town",
+      "from": "loading",
+      "to": "town",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "id": "town-again",
+      "from": "town",
+      "to": "again",
+      "variant": "emphasis",
+      "role": "main",
+      "label": "可再排"
+    },
+    {
+      "id": "again-home",
+      "from": "again",
+      "to": "home",
+      "variant": "dashed",
+      "role": "return",
+      "fromSide": "left",
+      "toSide": "left",
+      "label": "回到入口"
+    },
+    {
+      "id": "zero-done",
+      "from": "zero",
+      "to": "done",
+      "variant": "security",
+      "role": "branch",
+      "label": "确认归零",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "town-done",
+      "from": "town",
+      "to": "done",
+      "variant": "security",
+      "role": "branch",
+      "label": "打满所选局数",
+      "fromSide": "bottom",
+      "toSide": "left"
+    },
+    {
+      "id": "cutoff-done",
+      "from": "cutoff",
+      "to": "done",
+      "variant": "security",
+      "role": "branch",
+      "label": "到点",
+      "fromSide": "left",
+      "toSide": "right"
+    },
+    {
+      "id": "done-after",
+      "from": "done",
+      "to": "after",
+      "variant": "dashed",
+      "role": "branch",
+      "label": "已配置且队列成功",
+      "fromSide": "bottom",
+      "toSide": "top"
+    }
+  ],
+  "semanticChecks": {
+    "allowedRoots": [
+      "powershell",
+      "cutoff",
+      "update-check"
+    ],
+    "allowedTerminals": [
+      "install-guide",
+      "after",
+      "update-failed",
+      "update-restart"
+    ],
+    "requiredEdges": [
+      {
+        "from": "settlement",
+        "to": "loading"
+      },
+      {
+        "from": "loading",
+        "to": "town"
+      },
+      {
+        "from": "town",
+        "to": "again"
+      }
+    ],
+    "requiredPaths": [
+      {
+        "from": "home",
+        "to": "play"
+      },
+      {
+        "from": "quota",
+        "to": "done"
+      },
+      {
+        "from": "play",
+        "to": "again"
+      }
+    ]
+  },
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "运行前与画面接续",
+      "items": [
+        "任务启动前检查 PowerShell 7；只有 5.1 时提示安装。两者可并存，已装 7 不提醒；标准安装路径可作为 PATH 的备用。",
+        "先手动切换至旗舰心法，关闭遮挡主界面的新手引导。内测只勾选吃鸡和按需使用的定时开始；其余任务未完成。",
+        "主界面与退出后回城：识别沧海集，或成对识别「花萼楼＋行记」。顶部文字同时保留原区域和去除按钮图标的浅色备用区域。",
+        "已经在「龙门绝境」时直接读额度。启动时若识别到排队、局内或结算画面，就接上相应步骤。",
+        "匹配前识别异常可重试。看到「回城复活」时点击并回到入口，遇到登录验证会截图并停止。",
+        "额度记录和任务日志保存在 BJX 目录的 debug/ 中，日志导出保存在 export/ 中。"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "等待时怎么看画面",
+      "items": [
+        "匹配提交后，准备、加载或画面暂时不明时继续等本局。看到退出提示并确认回城后才能开始下一局。",
+        "满十分钟后，确认仍在局内且游戏在前台时，按一次 Shift+C。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "时间上限和收尾",
+      "items": [
+        "按任务启动日期的次日确定截止，默认凌晨 01:30；跨午夜、排队、局内和结算加载均不顺延。",
+        "「运行结束后操作」标注未完成，内测保持不勾选。现有实现仅在前面任务均成功后执行所选操作。"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "GitHub 更新与验收范围",
+      "items": [
+        "上方是可选更新流程，下方是用户开始吃鸡后的流程。0.4.1 及以前先手动换包一次；旧配置保留频道，新配置默认内测。",
+        "任务运行可下载，但全部任务停止后才安装。SHA-256 在下载后和安装前校验；无校验值不安装。安装期间拒绝新任务。",
+        "账号表、config 和本地通知配置保留；程序和资源按整包替换。安装失败提示恢复方式，不承诺完整回滚。",
+        "更新自动检查与文件测试不代替真实安装重启验收。新号主城识别仅故障画面回放通过，关闭引导后的实机恢复不能视为修复确认。"
+      ]
+    }
+  ]
+}

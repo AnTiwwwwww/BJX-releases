@@ -10,7 +10,17 @@ if (-not $SourceDirectory) { $SourceDirectory = Join-Path $projectRoot 'build/mx
 if (-not $OutputDirectory) { $OutputDirectory = Join-Path $projectRoot 'build/mxu-patched' }
 $source = [IO.Path]::GetFullPath($SourceDirectory)
 $output = [IO.Path]::GetFullPath($OutputDirectory)
-if (Test-Path -LiteralPath $source) { throw 'MXU source destination already exists; use a fresh directory.' }
+if (Test-Path -LiteralPath $source) {
+    # Actions may restore only Cargo's ignored target directory before checkout.
+    $children = @(Get-ChildItem -LiteralPath $source -Force)
+    if ($children.Count -ne 1 -or $children[0].Name -ne 'src-tauri' -or -not $children[0].PSIsContainer) {
+        throw 'MXU source destination already exists; use a fresh directory.'
+    }
+    $cargoChildren = @(Get-ChildItem -LiteralPath $children[0].FullName -Force)
+    if ($cargoChildren.Count -ne 1 -or $cargoChildren[0].Name -ne 'target' -or -not $cargoChildren[0].PSIsContainer) {
+        throw 'MXU source destination contains more than the restored Cargo cache.'
+    }
+}
 function Invoke-Checked([string] $Executable, [string[]] $Arguments) {
     & $Executable @Arguments
     if ($LASTEXITCODE -ne 0) { throw "$Executable failed ($LASTEXITCODE)." }
@@ -30,7 +40,7 @@ try {
     Invoke-Checked pnpm @('test')
     Invoke-Checked pnpm @('build')
     # Real Rust tests cover SHA-256 corruption, the install gate, and full-update file preservation.
-    Invoke-Checked cargo @('test', '--locked', '--manifest-path', 'src-tauri/Cargo.toml', '--lib', 'bjx_update', '--', '--test-threads=1')
+    Invoke-Checked cargo @('test', '--locked', '--release', '--target', 'x86_64-pc-windows-msvc', '--manifest-path', 'src-tauri/Cargo.toml', '--lib', 'bjx_update', '--', '--test-threads=1')
     Invoke-Checked pnpm @('tauri', 'build', '--no-bundle', '--target', 'x86_64-pc-windows-msvc')
     & (Join-Path $PSScriptRoot 'test-update-gate.ps1') -SourcePath (Join-Path $source 'src/App.tsx')
     Invoke-Checked git @('add', '--all')

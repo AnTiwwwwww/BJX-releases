@@ -1,6 +1,6 @@
 # 朋友内测说明
 
-从 [Releases](https://github.com/AnTiwwwwww/BJX-releases/releases) 下载 `BJX-win-x86_64-v0.4.1-beta.1.zip` 整包发给朋友。它包含界面程序、MaaFramework 运行库、中文 OCR 模型、已编译的 BJX 辅助程序、源码、说明和第三方许可。无需朋友编译，也不要只发送 `mxu.exe`。`BJX-source-*.zip` 是供开发者使用的源码包。
+从 [Releases](https://github.com/AnTiwwwwww/BJX-releases/releases) 下载 `BJX-win-x86_64-v0.4.2-beta.1.zip` 整包发给朋友。它包含界面程序、MaaFramework 运行库、中文 OCR 模型、已编译的 BJX 辅助程序、源码、说明和第三方许可。无需朋友编译，也不要只发送 `mxu.exe`。`BJX-source-*.zip` 是供开发者使用的源码包。
 
 ## 第一次运行
 
@@ -17,9 +17,9 @@
 
 ## 更新与保留配置
 
-当前 0.x 内测版本通过 Releases 手动更新，尚未接入 Mirror酱。先停止任务并退出 BJX，将新包解压到新目录，再复制旧目录中的 `config/` 和 `accounts.csv` 到新目录。首次打开核对任务选项与选中窗口，确认后再运行；旧目录保留供回退使用。
+本版起支持「设置 → GitHub 更新」，无需 CDK。旧版本先停止任务并退出 BJX，将新包解压到新目录，再复制自己的 `config/`、`accounts.csv` 和本地通知配置。保留旧目录，确认任务选项后再运行；旧配置可能仍选择稳定频道，接收 beta 时改为内测。
 
-新包不含 `config/` 或 `accounts.csv`。发布验证使用虚构资料检查 MXU 2.8.0 整包替换规则会保留这些顶层项目，并检查其自动安装条件会等待所有任务停止。该检查不是软件内联网更新验收；接入更新服务后仍需测试下载、安装与重启全过程。
+下载后和安装前均校验 SHA-256。任务运行或定时等待时不安装；下载完成、全部任务停止后会自动安装并重启。详细说明和真实升级验收状态见 [GitHub 联网更新](github-update.md)。
 
 ## 反馈问题
 
@@ -32,9 +32,10 @@
 先按 [安装说明](installation.md) 下载 `docs/dependencies.json` 固定的 5 个依赖文件到 `deps/`，然后运行：
 
 ```powershell
+pwsh -NoLogo -NoProfile -File ./tools/build-mxu.ps1
 pwsh -NoLogo -NoProfile -File ./tools/export-beta.ps1
 ```
 
-打包时逐个校验依赖 SHA-256，使用源码导出允许清单排除本机资料，重新编译两个自有辅助程序，并将当前路线图一起收录。输出 ZIP、逐文件校验清单和 ZIP 的 SHA-256 文件。运行库来自固定版本的上游原包；许可、原始说明和对应源码地址保存在 `third-party/`，BJX 的 MIT 许可不覆盖这些第三方组件。
+打包时逐个校验依赖 SHA-256，使用源码导出允许清单排除本机资料，重新编译两个自有辅助程序，并将当前路线图一起收录。输出 ZIP、逐文件校验清单和 ZIP 的 SHA-256 文件。MaaFramework 来自固定版本的上游原包，MXU 由固定源码与 BJX 补丁构建；许可、原始说明和对应源码地址保存在 `third-party/`，BJX 的 MIT 许可不覆盖这些第三方组件。
 
 打包检查不代替朋友电脑上的实机验收。完整一局、次日截止、长时间运行及不同心法/界面布局都需要分别记录结果。

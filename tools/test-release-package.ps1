@@ -48,6 +48,12 @@ try {
     }
     $interface = Get-Content -LiteralPath (Join-Path $extracted 'interface.json') -Raw | ConvertFrom-Json
     Assert-True ($interface.version -eq $manifest.version) '界面与清单版本必须一致'
+    $recipe = Get-Content -LiteralPath (Join-Path $extracted 'integrations/mxu/build.json') -Raw | ConvertFrom-Json
+    $runtimeReceipt = Get-Content -LiteralPath (Join-Path $extracted 'third-party/MXU/BJX-build-receipt.json') -Raw | ConvertFrom-Json
+    Assert-True ($runtimeReceipt.runtime_version -eq $recipe.runtime_version -and
+        $runtimeReceipt.patch_sha256 -eq $recipe.patch_sha256 -and
+        $runtimeReceipt.revision -eq $recipe.revision) 'MXU 必须来自匹配的 BJX 补丁构建'
+    Assert-True ((Get-FileHash -LiteralPath (Join-Path $extracted 'mxu.exe') -Algorithm SHA256).Hash -eq $runtimeReceipt.exe_sha256) 'MXU 程序应与构建回执一致'
     $hash = (Get-FileHash -LiteralPath $package -Algorithm SHA256).Hash.ToLowerInvariant()
     $sidecar = (Get-Content -LiteralPath ($package + '.sha256') -Raw).Trim()
     Assert-True ($sidecar -eq ($hash + '  ' + [IO.Path]::GetFileName($package))) 'ZIP 校验文件必须匹配'
