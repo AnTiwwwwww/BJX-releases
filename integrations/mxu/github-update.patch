@@ -1,5 +1,5 @@
 diff --git a/package.json b/package.json
-index 3acd2c9..d53165e 100644
+index 3acd2c9..d8f756a 100644
 --- a/package.json
 +++ b/package.json
 @@ -1,7 +1,7 @@
@@ -7,12 +7,12 @@ index 3acd2c9..d53165e 100644
    "name": "mxu",
    "private": true,
 -  "version": "0.1.0",
-+  "version": "2.8.0-bjx.1",
++  "version": "2.8.0-bjx.2",
    "type": "module",
    "scripts": {
      "dev": "vite",
 diff --git a/src-tauri/Cargo.lock b/src-tauri/Cargo.lock
-index 326ffe3..0ce986a 100644
+index 326ffe3..d922e20 100644
 --- a/src-tauri/Cargo.lock
 +++ b/src-tauri/Cargo.lock
 @@ -3127,7 +3127,7 @@ dependencies = [
@@ -20,28 +20,28 @@ index 326ffe3..0ce986a 100644
  [[package]]
  name = "mxu"
 -version = "0.1.0"
-+version = "2.8.0-bjx.1"
++version = "2.8.0-bjx.2"
  dependencies = [
   "axum",
   "base64 0.22.1",
 diff --git a/src-tauri/Cargo.toml b/src-tauri/Cargo.toml
-index a1c34f0..4bb9142 100644
+index a1c34f0..4672820 100644
 --- a/src-tauri/Cargo.toml
 +++ b/src-tauri/Cargo.toml
 @@ -1,6 +1,6 @@
  [package]
  name = "mxu"
 -version = "0.1.0"
-+version = "2.8.0-bjx.1"
++version = "2.8.0-bjx.2"
  description = "A Tauri App"
  authors = ["you"]
  edition = "2021"
 diff --git a/src-tauri/src/commands/bjx_update.rs b/src-tauri/src/commands/bjx_update.rs
 new file mode 100644
-index 0000000..b975b46
+index 0000000..a153aca
 --- /dev/null
 +++ b/src-tauri/src/commands/bjx_update.rs
-@@ -0,0 +1,73 @@
+@@ -0,0 +1,110 @@
 +//! BJX: verified packages and an install/task-start exclusion gate.
 +use std::io::Read;
 +use std::sync::{atomic::Ordering, Arc};
@@ -52,12 +52,31 @@ index 0000000..b975b46
 +pub fn begin_install(state: &MaaState) -> Result<(), String> {
 +    // run_task_impl checks the flag while holding this same mutex.
 +    let instances = state.instances.lock().map_err(|e| e.to_string())?;
-+    if instances.values().any(|i| i.tasker.as_ref().is_some_and(|t| t.running())) {
++    if state.active_pretasks.load(Ordering::SeqCst) != 0 ||
++        instances.values().any(|i| i.tasker.as_ref().is_some_and(|t| t.running())) {
 +        return Err("BJX_TASKS_RUNNING".into());
 +    }
 +    state.update_in_progress.compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
 +        .map_err(|_| "BJX_UPDATE_IN_PROGRESS".to_string())?;
 +    Ok(())
++}
++
++pub struct PretaskGuard<'a>(&'a MaaState);
++
++impl Drop for PretaskGuard<'_> {
++    fn drop(&mut self) {
++        self.0.active_pretasks.fetch_sub(1, Ordering::SeqCst);
++    }
++}
++
++pub fn begin_pretask(state: &MaaState) -> Result<PretaskGuard<'_>, String> {
++    // Share the install gate's mutex so neither side can pass a stale busy check.
++    let _instances = state.instances.lock().map_err(|e| e.to_string())?;
++    if state.update_in_progress.load(Ordering::SeqCst) {
++        return Err("BJX_UPDATE_IN_PROGRESS".into());
++    }
++    state.active_pretasks.fetch_add(1, Ordering::SeqCst);
++    Ok(PretaskGuard(state))
 +}
 +
 +#[tauri::command]
@@ -92,6 +111,24 @@ index 0000000..b975b46
 +#[cfg(test)]
 +mod tests {
 +    use super::*;
++    #[test]
++    fn bjx_update_and_pretask_exclude_each_other_and_release_on_return() {
++        let state = MaaState::default();
++        {
++            let _first = begin_pretask(&state).unwrap();
++            {
++                let _second = begin_pretask(&state).unwrap();
++                assert!(begin_install(&state).is_err());
++            }
++            assert!(begin_install(&state).is_err());
++        }
++        assert_eq!(state.active_pretasks.load(Ordering::SeqCst), 0);
++        assert!(begin_install(&state).is_ok());
++        assert!(begin_pretask(&state).is_err());
++        state.update_in_progress.store(false, Ordering::SeqCst);
++        assert!(begin_pretask(&state).is_ok());
++        assert!(begin_install(&state).is_ok());
++    }
 +    #[test]
 +    fn bjx_update_gate_is_exclusive_and_releasable() {
 +        let state = MaaState::default();
@@ -141,11 +178,38 @@ index 954ebdf..b6aa056 100644
  
  // 重新导出类型（供 lib.rs 使用）
  pub use app_config::AppConfigState;
+diff --git a/src-tauri/src/commands/system.rs b/src-tauri/src/commands/system.rs
+index 48f404d..b5c0e4a 100644
+--- a/src-tauri/src/commands/system.rs
++++ b/src-tauri/src/commands/system.rs
+@@ -649,9 +649,10 @@ pub async fn run_pretask(
+     cwd: Option<String>,
+ ) -> Result<i32, String> {
+     info!(
+-        "run_pretask: instance_id={}, program={}, args={:?}, cwd={:?}",
+-        instance_id, program, args, cwd
++        "run_pretask: instance_id={}, program={}, arg_count={}, cwd={:?}",
++        instance_id, program, args.len(), cwd
+     );
++    let _pretask_guard = super::bjx_update::begin_pretask(&state)?;
+ 
+     // Windows 下相对可执行路径会相对“父进程当前目录”解析，而非下方设置的 `current_dir`，
+     // 因此必须先基于 cwd 把相对 exec（如 `agent/go-service`）拼成绝对路径，复用 Agent
+@@ -755,6 +756,9 @@ pub async fn run_pretask(
+                 "run_pretask wait cancelled by stop request: {}",
+                 instance_id
+             );
++            // Stop the helper itself so cancelled startup cannot later continue work.
++            // Do not kill its descendants: a game it already launched belongs to the user.
++            let _ = child.kill();
+             std::thread::spawn(move || {
+                 let _ = child.wait();
+             });
 diff --git a/src-tauri/src/commands/types.rs b/src-tauri/src/commands/types.rs
-index abe9de5..069fdbf 100644
+index abe9de5..0941e3e 100644
 --- a/src-tauri/src/commands/types.rs
 +++ b/src-tauri/src/commands/types.rs
-@@ -337,6 +337,7 @@ impl LogBuffer {
+@@ -337,11 +337,14 @@ impl LogBuffer {
  /// MaaFramework 运行时状态
  #[derive(Default)]
  pub struct MaaState {
@@ -153,6 +217,13 @@ index abe9de5..069fdbf 100644
      pub lib_dir: Mutex<Option<PathBuf>>,
      pub resource_dir: Mutex<Option<PathBuf>>,
      pub instances: Mutex<HashMap<String, InstanceRuntime>>,
+     /// 前置程序停止请求（用于中断等待退出）
+     pub pre_action_stop_requests: Mutex<HashSet<String>>,
++    /// BJX: pre-task helpers also exclude update installation before Tasker exists.
++    pub active_pretasks: std::sync::atomic::AtomicUsize,
+     /// Controller 连接池：相同配置的 Controller 复用同一个 MaaControllerHandle
+     pub controller_pool: Mutex<HashMap<ControllerConfig, Controller>>,
+     /// 缓存的 ADB 设备列表（全局共享，避免重复搜索）
 diff --git a/src-tauri/src/commands/update.rs b/src-tauri/src/commands/update.rs
 index 5c2fb95..a822701 100644
 --- a/src-tauri/src/commands/update.rs
@@ -237,7 +308,7 @@ index 6cd8b24..440ba64 100644
              commands::update::fallback_update,
              commands::update::move_file_to_old,
 diff --git a/src-tauri/tauri.conf.json b/src-tauri/tauri.conf.json
-index f98495c..31e6b56 100644
+index f98495c..739f949 100644
 --- a/src-tauri/tauri.conf.json
 +++ b/src-tauri/tauri.conf.json
 @@ -1,7 +1,7 @@
@@ -245,7 +316,7 @@ index f98495c..31e6b56 100644
    "$schema": "https://schema.tauri.app/config/2",
    "productName": "mxu",
 -  "version": "0.1.0",
-+  "version": "2.8.0-bjx.1",
++  "version": "2.8.0-bjx.2",
    "identifier": "com.misteo.mxu",
    "build": {
      "beforeDevCommand": "pnpm dev",
@@ -342,6 +413,140 @@ index 8280e91..365e3d5 100644
  
    // 当前高亮的 section
    const [activeSection, setActiveSection] = useState('appearance');
+diff --git a/src/components/Toolbar.tsx b/src/components/Toolbar.tsx
+index 505ea10..dc13513 100644
+--- a/src/components/Toolbar.tsx
++++ b/src/components/Toolbar.tsx
+@@ -62,6 +62,7 @@ import {
+ import { scheduleService } from '@/services/scheduleService';
+ import { stopInstanceTasks } from '@/services/taskStopService';
+ import { taskStartService, type TaskStartOptions } from '@/services/taskStartService';
++import { runPretaskSequence, findWindowAfterPretask } from '@/services/pretaskService';
+ import { isTaskSelectedForRun, filterTasksForRun } from '@/utils/taskRunFilter';
+ import { isTauri } from '@/utils/paths';
+ import { onStateChanged } from '@/services/wsService';
+@@ -491,41 +492,39 @@ export function Toolbar({ showAddPanel, onToggleAddPanel, className }: ToolbarPr
+ 
+         if (enabledPretasks.length > 0) {
+           await beginPreActionControl(targetId);
++          updateInstance(targetId, { isRunning: true });
+           try {
+-            for (const { task, item } of enabledPretasks) {
+-              const args = buildPretaskArgs(
+-                item,
+-                task.optionValues ?? {},
+-                projectInterface,
+-                controllerName,
+-                resourceName,
+-              );
+-              const displayName =
+-                resolveI18nText(item.label, translations) || item.name || item.exec;
+-
+-              log.info(`实例 ${targetInstance.name}: 执行预任务:`, item.exec, args);
+-              addLog(targetId, {
+-                type: 'info',
+-                message: t('action.pretaskStarting', { name: displayName }),
+-              });
+-
+-              throwIfPreActionStopped(targetId);
+-              const exitCode = await maaService.runPretask(targetId, item.exec, args, basePath);
+-              throwIfPreActionStopped(targetId);
++            needsReconnect = await runPretaskSequence(enabledPretasks, {
++              throwIfStopped: () => throwIfPreActionStopped(targetId),
++              exitCodeError: (code) => t('action.pretaskExitCode', { code }),
++              run: async ({ task, item }) => {
++                const args = buildPretaskArgs(
++                  item,
++                  task.optionValues ?? {},
++                  projectInterface,
++                  controllerName,
++                  resourceName,
++                );
++                const displayName =
++                  resolveI18nText(item.label, translations) || item.name || item.exec;
+ 
+-              if (exitCode !== 0) {
+-                log.warn(`实例 ${targetInstance.name}: 预任务退出码非零:`, exitCode);
++                log.info(`实例 ${targetInstance.name}: 执行预任务:`, item.exec);
+                 addLog(targetId, {
+-                  type: 'warning',
+-                  message: t('action.pretaskExitCode', { code: exitCode }),
++                  type: 'info',
++                  message: t('action.pretaskStarting', { name: displayName }),
+                 });
+-              } else {
++
++                return maaService.runPretask(targetId, item.exec, args, basePath);
++              },
++              completed: ({ item }) => {
++                const displayName =
++                  resolveI18nText(item.label, translations) || item.name || item.exec;
+                 addLog(targetId, {
+                   type: 'success',
+                   message: t('action.pretaskCompleted', { name: displayName }),
+                 });
+-              }
+-            }
++              },
++            });
+           } catch (err) {
+             if ((err instanceof Error ? err.message : String(err)) === PRE_ACTION_CANCELLED_ERROR) {
+               // 取消由外层统一处理，finally 会清理前置控制状态
+@@ -536,11 +535,27 @@ export function Toolbar({ showAddPanel, onToggleAddPanel, className }: ToolbarPr
+               type: 'error',
+               message: t('action.pretaskFailed', { error: String(err) }),
+             });
++            throw err;
+           } finally {
+             await endPreActionControl(targetId);
++            updateInstance(targetId, { isRunning: false });
+           }
+         }
+ 
++        // A launch-only run is complete here; it needs neither a controller nor a Tasker.
++        if (
++          enabledPretasks.length > 0 &&
++          compatibleTasks.every((task) => isPretaskName(task.taskName))
++        ) {
++          setInstanceConnectionStatus(targetId, 'Disconnected');
++          updateInstance(targetId, { isRunning: false });
++          setInstanceTaskStatus(targetId, 'Succeeded');
++          setInstanceCurrentTaskId(targetId, null);
++          clearScheduleExecution(targetId);
++          onPhaseChange?.('idle');
++          return true;
++        }
++
+         // 收集所有启用且有程序路径的前置程序，按列表顺序执行
+         const allPreActions = (targetInstance.preActions ?? []).filter(
+           (a) => a.enabled && a.program.trim(),
+@@ -812,8 +827,15 @@ export function Toolbar({ showAddPanel, onToggleAddPanel, className }: ToolbarPr
+             } else if (isDesktopWindowControllerType(controllerType) && savedDevice.windowName) {
+               const { classRegex, titleRegex } = getDesktopWindowFilters(controller);
+               const windows = await maaService.findWin32Windows(classRegex, titleRegex);
+-              const matchedWindow = windows.find((w) => w.window_name === savedDevice.windowName);
++              const matchedWindow = findWindowAfterPretask(
++                windows,
++                savedDevice.windowName,
++                enabledPretasks.length > 0,
++              );
+               if (!matchedWindow) {
++                if (enabledPretasks.length > 0 && windows.length > 1) {
++                  return failStart(t('taskList.autoConnect.noUniqueWindow'));
++                }
+                 return failStart(
+                   t('taskList.autoConnect.windowNotFound', { name: savedDevice.windowName }),
+                 );
+@@ -888,6 +910,9 @@ export function Toolbar({ showAddPanel, onToggleAddPanel, className }: ToolbarPr
+             } else if (isDesktopWindowControllerType(controllerType)) {
+               const { classRegex, titleRegex } = getDesktopWindowFilters(controller);
+               const windows = await maaService.findWin32Windows(classRegex, titleRegex);
++              if (enabledPretasks.length > 0 && windows.length > 1) {
++                return failStart(t('taskList.autoConnect.noUniqueWindow'));
++              }
+               if (windows.length === 0) {
+                 return failStart(t('taskList.autoConnect.noWindowFound'));
+               }
 diff --git a/src/components/UpdatePanel.tsx b/src/components/UpdatePanel.tsx
 index e3e3bf3..ff3fc77 100644
 --- a/src/components/UpdatePanel.tsx
@@ -431,60 +636,130 @@ index bd9aaf3..ccc06f4 100644
              {/* 代理设置 */}
              {!isProxyDisabled && (
 diff --git a/src/i18n/locales/en-US.ts b/src/i18n/locales/en-US.ts
-index dd052f0..906db3e 100644
+index dd052f0..7b9e298 100644
 --- a/src/i18n/locales/en-US.ts
 +++ b/src/i18n/locales/en-US.ts
-@@ -1,4 +1,6 @@
+@@ -1,4 +1,12 @@
  export default {
-+  bjxUpdate: {"title": "GitHub Updates", "hint": "Public GitHub Releases; no CDK required. Beta is the default channel. Packages are SHA-256 verified and installed only after all tasks stop.", "tasksRunning": "Tasks are running or an update is in progress. Stop all tasks before installing.", "checksumFailed": "Package verification failed. Download the update again."},
++  bjxUpdate: {
++    title: 'GitHub Updates',
++    hint: 'Public GitHub Releases; no CDK required. Beta is the default channel. Packages are SHA-256 verified and installed only after all tasks stop.',
++    tasksRunning:
++      'Tasks are running or an update is in progress. Stop all tasks before installing.',
++    checksumFailed: 'Package verification failed. Download the update again.',
++  },
 +
    // Common
    common: {
      confirm: 'Confirm',
+@@ -245,6 +253,8 @@ export default {
+       noSavedDevice: 'No saved device configuration',
+       noDeviceFound: 'No devices found',
+       noWindowFound: 'No windows found',
++      noUniqueWindow:
++        'Multiple windows match after startup. Keep only the target window open and retry.',
+       connectFailed: 'Auto connect failed',
+       retryConnect: 'Connection failed, retry {{attempt}}...',
+       autoSelectedDevice:
 diff --git a/src/i18n/locales/ja-JP.ts b/src/i18n/locales/ja-JP.ts
-index 52e6a68..4a80ce4 100644
+index 52e6a68..bd2c039 100644
 --- a/src/i18n/locales/ja-JP.ts
 +++ b/src/i18n/locales/ja-JP.ts
-@@ -1,4 +1,6 @@
+@@ -1,4 +1,12 @@
  export default {
-+  bjxUpdate: {"title": "GitHub Updates", "hint": "Public GitHub Releases; no CDK required. Beta is the default channel. Packages are SHA-256 verified and installed only after all tasks stop.", "tasksRunning": "Tasks are running or an update is in progress. Stop all tasks before installing.", "checksumFailed": "Package verification failed. Download the update again."},
++  bjxUpdate: {
++    title: 'GitHub Updates',
++    hint: 'Public GitHub Releases; no CDK required. Beta is the default channel. Packages are SHA-256 verified and installed only after all tasks stop.',
++    tasksRunning:
++      'Tasks are running or an update is in progress. Stop all tasks before installing.',
++    checksumFailed: 'Package verification failed. Download the update again.',
++  },
 +
    // 共通
    common: {
      confirm: '確定',
+@@ -239,6 +247,8 @@ export default {
+       noSavedDevice: '保存されたデバイス設定がありません',
+       noDeviceFound: 'デバイスが見つかりませんでした',
+       noWindowFound: 'ウィンドウが見つかりませんでした',
++      noUniqueWindow:
++        '起動後に複数の候補が見つかりました。対象のウィンドウだけを開いて再試行してください。',
+       connectFailed: '自動接続に失敗しました',
+       retryConnect: '接続失敗、リトライ {{attempt}}...',
+       autoSelectedDevice:
 diff --git a/src/i18n/locales/ko-KR.ts b/src/i18n/locales/ko-KR.ts
-index 0491740..be995e4 100644
+index 0491740..7ad313e 100644
 --- a/src/i18n/locales/ko-KR.ts
 +++ b/src/i18n/locales/ko-KR.ts
-@@ -1,4 +1,6 @@
+@@ -1,4 +1,12 @@
  export default {
-+  bjxUpdate: {"title": "GitHub Updates", "hint": "Public GitHub Releases; no CDK required. Beta is the default channel. Packages are SHA-256 verified and installed only after all tasks stop.", "tasksRunning": "Tasks are running or an update is in progress. Stop all tasks before installing.", "checksumFailed": "Package verification failed. Download the update again."},
++  bjxUpdate: {
++    title: 'GitHub Updates',
++    hint: 'Public GitHub Releases; no CDK required. Beta is the default channel. Packages are SHA-256 verified and installed only after all tasks stop.',
++    tasksRunning:
++      'Tasks are running or an update is in progress. Stop all tasks before installing.',
++    checksumFailed: 'Package verification failed. Download the update again.',
++  },
 +
    // 공통
    common: {
      confirm: '확인',
+@@ -236,6 +244,7 @@ export default {
+       noSavedDevice: '저장된 기기 설정이 없습니다',
+       noDeviceFound: '기기를 찾을 수 없습니다',
+       noWindowFound: '창을 찾을 수 없습니다',
++      noUniqueWindow: '시작 후 여러 창이 일치합니다. 대상 창만 열어 둔 다음 다시 시도하세요.',
+       connectFailed: '자동 연결에 실패했습니다',
+       retryConnect: '연결 실패, {{attempt}}번째 재시도...',
+       autoSelectedDevice:
 diff --git a/src/i18n/locales/zh-CN.ts b/src/i18n/locales/zh-CN.ts
-index cdbca16..e2e0e2d 100644
+index cdbca16..fef2f42 100644
 --- a/src/i18n/locales/zh-CN.ts
 +++ b/src/i18n/locales/zh-CN.ts
-@@ -1,4 +1,6 @@
+@@ -1,4 +1,11 @@
  export default {
-+  bjxUpdate: {"title": "GitHub 更新", "hint": "从公开 GitHub Releases 获取新版，无需 CDK。默认内测频道；下载后校验 SHA-256，所有任务停止后才安装。", "tasksRunning": "任务仍在运行或更新尚未完成，请停止所有任务后再安装。", "checksumFailed": "安装包校验失败，请重新下载更新。"},
++  bjxUpdate: {
++    title: 'GitHub 更新',
++    hint: '从公开 GitHub Releases 获取新版，无需 CDK。默认内测频道；下载后校验 SHA-256，所有任务停止后才安装。',
++    tasksRunning: '任务仍在运行或更新尚未完成，请停止所有任务后再安装。',
++    checksumFailed: '安装包校验失败，请重新下载更新。',
++  },
 +
    // 通用
    common: {
      confirm: '确定',
+@@ -236,6 +243,7 @@ export default {
+       noSavedDevice: '没有保存的设备配置',
+       noDeviceFound: '未搜索到任何设备',
+       noWindowFound: '未搜索到任何窗口',
++      noUniqueWindow: '启动后找到多个候选窗口，请只保留一个目标窗口后重试',
+       connectFailed: '自动连接失败',
+       retryConnect: '连接失败，第 {{attempt}} 次重试...',
+       autoSelectedDevice:
 diff --git a/src/i18n/locales/zh-TW.ts b/src/i18n/locales/zh-TW.ts
-index fa4098b..527ade2 100644
+index fa4098b..8d8a9fe 100644
 --- a/src/i18n/locales/zh-TW.ts
 +++ b/src/i18n/locales/zh-TW.ts
-@@ -1,4 +1,6 @@
+@@ -1,4 +1,11 @@
  export default {
-+  bjxUpdate: {"title": "GitHub 更新", "hint": "从公开 GitHub Releases 获取新版，无需 CDK。默认内测频道；下载后校验 SHA-256，所有任务停止后才安装。", "tasksRunning": "任务仍在运行或更新尚未完成，请停止所有任务后再安装。", "checksumFailed": "安装包校验失败，请重新下载更新。"},
++  bjxUpdate: {
++    title: 'GitHub 更新',
++    hint: '从公开 GitHub Releases 获取新版，无需 CDK。默认内测频道；下载后校验 SHA-256，所有任务停止后才安装。',
++    tasksRunning: '任务仍在运行或更新尚未完成，请停止所有任务后再安装。',
++    checksumFailed: '安装包校验失败，请重新下载更新。',
++  },
 +
    // 通用
    common: {
      confirm: '確定',
+@@ -232,6 +239,7 @@ export default {
+       noSavedDevice: '沒有儲存的裝置設定',
+       noDeviceFound: '未搜尋到任何裝置',
+       noWindowFound: '未搜尋到任何視窗',
++      noUniqueWindow: '啟動後找到多個候選視窗，請只保留一個目標視窗後重試',
+       connectFailed: '自動連接失敗',
+       retryConnect: '連接失敗，第 {{attempt}} 次重試...',
+       autoSelectedDevice:
 diff --git a/src/services/githubUpdate.ts b/src/services/githubUpdate.ts
 new file mode 100644
 index 0000000..960f6ba
@@ -579,6 +854,44 @@ index 0000000..960f6ba
 +    downloadUrl: asset.browser_download_url, filename, fileSize: asset.size,
 +    sha256, updateType: 'full' as const, downloadSource: 'github' as const,
 +  };
++}
+diff --git a/src/services/pretaskService.ts b/src/services/pretaskService.ts
+new file mode 100644
+index 0000000..6ee1c59
+--- /dev/null
++++ b/src/services/pretaskService.ts
+@@ -0,0 +1,32 @@
++/** Run PI pre-tasks before any controller/resource work, aborting at the first failure. */
++export async function runPretaskSequence<T>(
++  items: readonly T[],
++  callbacks: {
++    throwIfStopped: () => void;
++    run: (item: T) => Promise<number>;
++    completed: (item: T) => void;
++    exitCodeError: (code: number) => string;
++  },
++): Promise<boolean> {
++  for (const item of items) {
++    callbacks.throwIfStopped();
++    const code = await callbacks.run(item);
++    callbacks.throwIfStopped();
++    if (code !== 0) throw new Error(callbacks.exitCodeError(code));
++    callbacks.completed(item);
++  }
++  // Even a successful pre-task may have replaced a window behind a stale connection.
++  return items.length > 0;
++}
++
++/** A restarted application may change its title; never choose between ambiguous windows. */
++export function findWindowAfterPretask<T extends { window_name: string }>(
++  windows: readonly T[],
++  savedTitle: string,
++  pretaskCompleted: boolean,
++): T | undefined {
++  const exact = windows.filter((window) => window.window_name === savedTitle);
++  if (exact.length === 1) return exact[0];
++  if (exact.length > 1) return undefined;
++  return pretaskCompleted && windows.length === 1 ? windows[0] : undefined;
 +}
 diff --git a/src/services/proxyService.ts b/src/services/proxyService.ts
 index 8db61d1..576c55b 100644
@@ -909,4 +1222,282 @@ index 0000000..664704c
 +  const r = release(); r.assets[0].digest = 'sha256:invalid';
 +  await assert.rejects(checkGitHubUpdate(options, fetchReleases([r])));
 +  await assert.rejects(checkGitHubUpdate({ ...options, githubUrl: 'https://github.com.evil.test/o/r' }, fetchReleases([r])));
++});
+diff --git a/tests/pretaskStart.test.ts b/tests/pretaskStart.test.ts
+new file mode 100644
+index 0000000..55b86bc
+--- /dev/null
++++ b/tests/pretaskStart.test.ts
+@@ -0,0 +1,272 @@
++import assert from 'node:assert/strict';
++import test from 'node:test';
++import { readFileSync } from 'node:fs';
++import vm from 'node:vm';
++import ts from 'typescript';
++import { runPretaskSequence, findWindowAfterPretask } from '../src/services/pretaskService';
++
++const CANCELLED = 'MXU_PRE_ACTION_CANCELLED';
++
++test('pre-tasks execute in order and stop before later items on nonzero exit', async () => {
++  const visited: number[] = [];
++  const completed: number[] = [];
++  await assert.rejects(
++    runPretaskSequence([1, 2, 3], {
++      throwIfStopped() {},
++      run: async (item) => {
++        visited.push(item);
++        return item === 2 ? 17 : 0;
++      },
++      completed: (item) => completed.push(item),
++      exitCodeError: (code) => `exit ${code}`,
++    }),
++    /exit 17/,
++  );
++  assert.deepEqual(visited, [1, 2]);
++  assert.deepEqual(completed, [1]);
++});
++
++test('pre-task exceptions propagate and no later helper starts', async () => {
++  const visited: number[] = [];
++  await assert.rejects(
++    runPretaskSequence([1, 2], {
++      throwIfStopped() {},
++      run: async (item) => {
++        visited.push(item);
++        throw new Error('spawn failed');
++      },
++      completed() {
++        assert.fail('failed helper cannot complete');
++      },
++      exitCodeError: String,
++    }),
++    /spawn failed/,
++  );
++  assert.deepEqual(visited, [1]);
++});
++
++test('cancellation before and after a helper prevents completion and next helper', async () => {
++  for (const before of [true, false]) {
++    let stopped = before;
++    let runCount = 0;
++    await assert.rejects(
++      runPretaskSequence([1, 2], {
++        throwIfStopped: () => {
++          if (stopped) throw new Error(CANCELLED);
++        },
++        run: async () => {
++          runCount++;
++          stopped = true;
++          return 0;
++        },
++        completed() {
++          assert.fail('cancelled helper cannot complete');
++        },
++        exitCodeError: String,
++      }),
++      new RegExp(CANCELLED),
++    );
++    assert.equal(runCount, before ? 0 : 1);
++  }
++});
++
++test('successful pre-tasks request reconnection, while an empty set does not', async () => {
++  const callbacks = {
++    throwIfStopped() {},
++    run: async () => 0,
++    completed() {},
++    exitCodeError: String,
++  };
++  assert.equal(await runPretaskSequence([], callbacks), false);
++  assert.equal(await runPretaskSequence([1, 2], callbacks), true);
++});
++
++test('changed window title can recover after startup only when the match is unique', () => {
++  const current = { window_name: '剑网3 登录', handle: 2 };
++  const other = { window_name: '剑网3 其他', handle: 3 };
++  assert.equal(findWindowAfterPretask([current], '剑网3 旧标题', true), current);
++  assert.equal(findWindowAfterPretask([current], '剑网3 旧标题', false), undefined);
++  assert.equal(findWindowAfterPretask([current, other], '剑网3 旧标题', true), undefined);
++  assert.equal(
++    findWindowAfterPretask([current, { ...current, handle: 4 }], current.window_name, true),
++    undefined,
++  );
++});
++
++// Execute the actual Toolbar startup callback, replacing only its UI/native boundaries.
++const source = readFileSync(new URL('../src/components/Toolbar.tsx', import.meta.url), 'utf8');
++const ast = ts.createSourceFile(
++  'Toolbar.tsx',
++  source,
++  ts.ScriptTarget.Latest,
++  true,
++  ts.ScriptKind.TSX,
++);
++let startup: ts.ArrowFunction | undefined;
++function visit(node: ts.Node) {
++  if (
++    ts.isVariableDeclaration(node) &&
++    node.name.getText(ast) === 'startTasksForInstance' &&
++    node.initializer &&
++    ts.isCallExpression(node.initializer)
++  ) {
++    startup = node.initializer.arguments[0] as ts.ArrowFunction;
++  }
++  ts.forEachChild(node, visit);
++}
++visit(ast);
++assert.ok(startup, 'Toolbar startup callback must exist');
++const compiled = ts.transpile(`(${startup.getText(ast)})`, { target: ts.ScriptTarget.ES2022 });
++
++function toolbarHarness(
++  mode: 'success' | 'nonzero' | 'throw' | 'cancel',
++  onlyPretask = false,
++  windowCount = 1,
++) {
++  const calls: string[] = [];
++  let cancelled = false;
++  const pretasks = [{ name: 'launch', exec: 'launch.exe' }];
++  const selectedTasks = [{ id: 'launch', taskName: '__MXU_PRETASK__launch' }];
++  if (!onlyPretask) selectedTasks.push({ id: 'login', taskName: 'login' });
++  const instance = {
++    id: 'test',
++    name: 'test',
++    isRunning: false,
++    selectedTasks,
++    savedDevice: { windowName: '剑网3 旧标题' },
++  };
++  const ui = { status: null as string | null, connected: 'Connected' };
++  const lastStartCancelledRef = { current: false };
++  const start = vm.runInNewContext(compiled, {
++    Error,
++    PRE_ACTION_CANCELLED_ERROR: CANCELLED,
++    lastStartCancelledRef,
++    preActionControlledInstanceIdRef: { current: null },
++    projectInterface: {
++      controller: [{ name: 'game', type: 'Win32' }],
++      resource: [{ name: 'game' }],
++      pretask: pretasks,
++    },
++    selectedController: {},
++    selectedResource: {},
++    instanceConnectionStatus: { test: 'Connected' },
++    instanceResourceLoaded: { test: true },
++    basePath: 'test-only',
++    translations: {},
++    useAppStore: { getState: () => ({ globalOptionValues: {} }) },
++    t: (key: string, values?: { code?: number }) =>
++      values?.code === undefined ? key : `${key}: ${values.code}`,
++    log: { info() {}, warn() {}, error() {} },
++    addLog() {},
++    filterTasksForRun: (tasks: unknown) => tasks,
++    resolveCompatTaskDef() {},
++    isTaskCompatible: () => true,
++    validateInstanceCheckboxCounts: () => [],
++    requiresUnlockedWorkstation: () => true,
++    getPretaskItems: () => pretasks,
++    pretaskName: (p: { name: string }) => '__MXU_PRETASK__' + p.name,
++    isPretaskName: (name: string) => name.startsWith('__MXU_PRETASK__'),
++    getPretaskItem: () => pretasks[0],
++    resolveI18nText: (text: unknown) => text,
++    buildPretaskArgs: () => ['{}'],
++    runPretaskSequence,
++    findWindowAfterPretask,
++    beginPreActionControl: async () => {
++      calls.push('begin');
++    },
++    endPreActionControl: async () => {
++      calls.push('end');
++    },
++    throwIfPreActionStopped: () => {
++      if (cancelled) throw new Error(CANCELLED);
++    },
++    updateInstance: (_id: string, changes: object) => Object.assign(instance, changes),
++    setInstanceConnectionStatus: (_id: string, state: string) => {
++      ui.connected = state;
++    },
++    setInstanceTaskStatus: (_id: string, status: string | null) => {
++      ui.status = status;
++    },
++    setInstanceCurrentTaskId() {},
++    clearScheduleExecution() {},
++    setIsStopping() {},
++    normalizeAgentConfigs: () => undefined,
++    ensureMaaInitialized: async () => {
++      calls.push('init');
++    },
++    isDesktopWindowControllerType: (type: string) => type === 'Win32',
++    getDesktopWindowFilters: () => ({ classRegex: 'KGWin32App', titleRegex: '剑网3' }),
++    buildDesktopWindowControllerConfig: (_c: unknown, handle: number) => ({ handle }),
++    maaService: {
++      isWorkstationLocked: async () => false,
++      runPretask: async () => {
++        calls.push('pretask');
++        assert.equal(instance.isRunning, true, 'automatic updates must see startup as busy');
++        if (mode === 'throw') throw new Error('spawn failed');
++        if (mode === 'cancel') cancelled = true;
++        return mode === 'nonzero' ? 17 : 0;
++      },
++      createInstance: async () => {
++        calls.push('create');
++      },
++      findWin32Windows: async () =>
++        Array.from({ length: windowCount }, (_, i) => ({
++          window_name: '剑网3 登录' + i,
++          class_name: 'KGWin32App',
++          handle: 200 + i,
++        })),
++      onCallback: async () => () => {},
++      connectController: async (_id: string, config: { handle: number }) => {
++        calls.push('connect:' + config.handle);
++        throw new Error('TEST_AFTER_CONNECT');
++      },
++      getInstanceState: async () => {
++        calls.push('cached-connection');
++        return { connectionStatus: 'Connected', resourceLoaded: true };
++      },
++    },
++  });
++  return { calls, instance, ui, lastStartCancelledRef, run: () => start(instance) };
++}
++
++test('Toolbar blocks controller connection after nonzero exit or spawn exception', async () => {
++  for (const mode of ['nonzero', 'throw'] as const) {
++    const h = toolbarHarness(mode);
++    assert.equal(await h.run(), false);
++    assert.deepEqual(h.calls, ['begin', 'pretask', 'end']);
++    assert.equal(h.ui.status, 'Failed');
++    assert.equal(h.instance.isRunning, false);
++  }
++});
++
++test('Toolbar cancellation preserves cancelled status and never connects', async () => {
++  const h = toolbarHarness('cancel');
++  assert.equal(await h.run(), false);
++  assert.deepEqual(h.calls, ['begin', 'pretask', 'end']);
++  assert.equal(h.lastStartCancelledRef.current, true);
++  assert.equal(h.ui.status, null);
++});
++
++test('Toolbar allows a pretask-only run without connecting or loading a resource', async () => {
++  const h = toolbarHarness('success', true);
++  assert.equal(await h.run(), true);
++  assert.deepEqual(h.calls, ['begin', 'pretask', 'end']);
++  assert.equal(h.ui.status, 'Succeeded');
++  assert.equal(h.ui.connected, 'Disconnected');
++  assert.equal(h.instance.isRunning, false);
++});
++
++test('Toolbar refreshes an existing controller and accepts a unique new window title', async () => {
++  const h = toolbarHarness('success');
++  await h.run();
++  assert.deepEqual(h.calls, ['begin', 'pretask', 'end', 'init', 'create', 'connect:200']);
++});
++
++test('Toolbar does not select among multiple new windows after startup', async () => {
++  const h = toolbarHarness('success', false, 2);
++  assert.equal(await h.run(), false);
++  assert.equal(
++    h.calls.some((call) => call.startsWith('connect:')),
++    false,
++  );
 +});

@@ -64,8 +64,9 @@ jobs:
           $package = ./tools/export-beta.ps1
           ./tools/test-release-package.ps1 -PackagePath $package.Path
           ./tools/export-source.ps1 -OutputFile (Join-Path $PWD "export/BJX-source-v$version.zip")
-          Copy-Item -LiteralPath 'build/mxu-patched/MXU-source-v2.8.0-bjx.1.zip' -Destination export
-          Copy-Item -LiteralPath 'build/mxu-patched/MXU-source-v2.8.0-bjx.1.zip.sha256' -Destination export
+          $runtimeVersion = (Get-Content integrations/mxu/build.json -Raw | ConvertFrom-Json).runtime_version
+          Copy-Item -LiteralPath "build/mxu-patched/MXU-source-v$runtimeVersion.zip" -Destination export
+          Copy-Item -LiteralPath "build/mxu-patched/MXU-source-v$runtimeVersion.zip.sha256" -Destination export
           "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
       - name: Upload verified build
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
