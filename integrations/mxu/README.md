@@ -8,6 +8,8 @@
 
 启动预任务按 `interface.json` 中的声明顺序执行，始终早于普通任务（包括普通「定时开始」），不受卡片排序影响。密码应由 Agent 在内存读取本机账号表，不应作为预任务命令行参数传递。
 
+当 Agent 通过 `MaaTaskerPostStop` 停止整次运行时，MXU 在原生任务回调中检查 `stopping()`，将中断产生的成功回调按失败处理，并结束被清除的剩余队列，避免登录失败显示成功或留下等待中的后续任务。普通节点失败后通过 `on_error` 恢复的流程仍可成功；这里只处理整队列停止，不按 BJX 任务名判断。
+
 在 Windows x64 安装 Node.js 22、pnpm 10.28.0、Rust stable 和 Visual Studio C++ 构建工具后，在 BJX 根目录运行 `./tools/build-mxu.ps1`。构建使用上游锁文件；失败不会生成可供整包使用的构建回执。发布工作流负责执行前端、Rust、运行门禁和整包检查。
 
 MXU 及本补丁按 AGPL-3.0 分发，许可见 `licenses/MXU-AGPL-3.0.txt`。每次 Release 附带与 `build.json` 版本一致的 `MXU-source-v<runtime_version>.zip` 及 SHA-256，包含完整对应源码、锁文件和测试；BJX 源码包提供本补丁与构建脚本。BJX 自有资源的 MIT 许可不改变第三方代码许可。

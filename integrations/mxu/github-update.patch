@@ -152,8 +152,30 @@ index 0000000..a153aca
 +        std::fs::remove_file(path).unwrap();
 +    }
 +}
+diff --git a/src-tauri/src/commands/maa_agent.rs b/src-tauri/src/commands/maa_agent.rs
+index 1f0d798..617cc6b 100644
+--- a/src-tauri/src/commands/maa_agent.rs
++++ b/src-tauri/src/commands/maa_agent.rs
+@@ -615,7 +615,7 @@ pub async fn start_tasks_impl(
+             let inst_id_for_sink = instance_id.clone();
+             t.add_sink(move |msg, detail| {
+                 // 先更新后端 TaskRunState（单一真相来源）
+-                handle_task_callback(
++                let normalized = handle_task_callback(
+                     &maa_state_for_sink,
+                     &app_handle,
+                     &inst_id_for_sink,
+@@ -623,7 +623,7 @@ pub async fn start_tasks_impl(
+                     detail,
+                 );
+                 // 再转发原始回调到前端
+-                emit_callback_event(&app_handle, msg, detail);
++                emit_callback_event(&app_handle, normalized.unwrap_or(msg), detail);
+             })
+             .map_err(|e| e.to_string())?;
+             debug!("[start_tasks] Tasker sink added");
 diff --git a/src-tauri/src/commands/maa_core.rs b/src-tauri/src/commands/maa_core.rs
-index c32d227..6909990 100644
+index c32d227..5bfe4ef 100644
 --- a/src-tauri/src/commands/maa_core.rs
 +++ b/src-tauri/src/commands/maa_core.rs
 @@ -1314,6 +1314,9 @@ pub fn run_task_impl(
@@ -166,6 +188,23 @@ index c32d227..6909990 100644
      let instance = instances.get_mut(instance_id).ok_or("Instance not found")?;
  
      let resource = instance.resource.as_ref().ok_or("Resource not loaded")?;
+@@ -1340,14 +1343,14 @@ pub fn run_task_impl(
+         let instance_id_for_sink = instance_id.to_string();
+         tasker
+             .add_sink(move |msg, detail| {
+-                handle_task_callback(
++                let normalized = handle_task_callback(
+                     &maa_state_for_sink,
+                     &app_for_sink,
+                     &instance_id_for_sink,
+                     msg,
+                     detail,
+                 );
+-                emit_callback_event(&app_for_sink, msg, detail);
++                emit_callback_event(&app_for_sink, normalized.unwrap_or(msg), detail);
+             })
+             .map_err(|e| e.to_string())?;
+ 
 diff --git a/src-tauri/src/commands/mod.rs b/src-tauri/src/commands/mod.rs
 index 954ebdf..b6aa056 100644
 --- a/src-tauri/src/commands/mod.rs
@@ -293,6 +332,250 @@ index 5c2fb95..a822701 100644
 +        std::fs::remove_dir_all(root).unwrap();
 +    }
 +}
+diff --git a/src-tauri/src/commands/utils.rs b/src-tauri/src/commands/utils.rs
+index 84e0ab2..3e23934 100644
+--- a/src-tauri/src/commands/utils.rs
++++ b/src-tauri/src/commands/utils.rs
+@@ -2,7 +2,7 @@
+ //!
+ //! 提供路径处理和其他通用工具函数
+ 
+-use super::types::{MaaCallbackEvent, MaaState, StateChangedEvent};
++use super::types::{MaaCallbackEvent, MaaState, StateChangedEvent, TaskRunState};
+ use crate::ws_broadcast::{WsBroadcast, WsEvent};
+ use std::path::PathBuf;
+ use std::sync::Arc;
+@@ -61,77 +61,50 @@ pub fn handle_task_callback(
+     instance_id: &str,
+     message: &str,
+     details: &str,
+-) {
++) -> Option<&'static str> {
+     let is_started = message == "Tasker.Task.Starting";
+     let is_succeeded = message == "Tasker.Task.Succeeded";
+     let is_failed = message == "Tasker.Task.Failed";
+ 
+     if !is_started && !is_succeeded && !is_failed {
+-        return;
++        return None;
+     }
+ 
+-    // 解析 task_id
+-    let task_id: i64 = match serde_json::from_str::<serde_json::Value>(details)
+-        .ok()
+-        .and_then(|v| v.get("task_id").and_then(|id| id.as_i64()))
+-    {
++    let detail = serde_json::from_str::<serde_json::Value>(details).ok()?;
++    // MaaFW emits this internal marker after clearing its queue. It is not a user task.
++    if detail.get("entry").and_then(|v| v.as_str()) == Some("MaaTaskerPostStop") {
++        return None;
++    }
++    let task_id: i64 = match detail.get("task_id").and_then(|id| id.as_i64()) {
+         Some(id) => id,
+-        None => return,
++        None => return None,
+     };
+ 
+-    let all_done = {
++    let (all_done, effective_success) = {
+         let mut instances = match maa_state.instances.lock() {
+             Ok(g) => g,
+-            Err(_) => return,
++            Err(_) => return None,
+         };
+         let instance = match instances.get_mut(instance_id) {
+             Some(i) => i,
+-            None => return,
++            None => return None,
+         };
+-        let state = &mut instance.task_run_state;
+-
+-        if is_started {
+-            // 任务开始：定位该任务在队列中的索引，更新当前索引和状态
+-            if let Some(idx) = state.pending_task_ids.iter().position(|&id| id == task_id) {
+-                state.current_task_index = idx;
+-            }
+-            if let Some(selected_id) = state.mappings.get(&task_id).cloned() {
+-                state.statuses.insert(selected_id, "running".to_string());
+-            }
+-            false // 未完成
+-        } else {
+-            // 任务成功或失败
+-            let status_str = if is_succeeded { "succeeded" } else { "failed" };
+-            if let Some(selected_id) = state.mappings.get(&task_id).cloned() {
+-                state.statuses.insert(selected_id, status_str.to_string());
+-            }
+-
+-            // 检查所有已入队任务是否均已完成
+-            let all_completed = state.pending_task_ids.iter().all(|id| {
+-                state
+-                    .mappings
+-                    .get(id)
+-                    .and_then(|sel_id| state.statuses.get(sel_id))
+-                    .map(|s| s == "succeeded" || s == "failed")
+-                    .unwrap_or(false)
+-            });
+-
+-            if all_completed {
+-                let has_failed = state.statuses.values().any(|s| s == "failed");
+-                state.overall_status =
+-                    Some(if has_failed { "Failed" } else { "Succeeded" }.to_string());
+-                instance.task_ids.clear();
+-            }
+-
+-            all_completed
++        // Native sinks run synchronously while the Tasker is still running. MaaFW 5.14
++        // reports an interrupted PipelineTask as Succeeded, so sample stopping here,
++        // before forwarding the callback to the asynchronous UI/cache listeners.
++        let stopping = instance.tasker.as_ref().is_some_and(|tasker| tasker.stopping());
++        let result = apply_task_callback(&mut instance.task_run_state, task_id, message, stopping)?;
++        if result.0 {
++            instance.task_ids.clear();
+         }
++        result
+     }; // 锁在此处释放
+ 
+     // 遥测埋点（锁外调用，仅操作 telemetry 内部的 RUNS 锁）
+     if is_started {
+         super::telemetry::on_task_start(instance_id, task_id);
+     } else {
+-        super::telemetry::on_task_finished(instance_id, task_id, is_succeeded);
++        super::telemetry::on_task_finished(instance_id, task_id, effective_success);
+     }
+     if all_done {
+         super::telemetry::on_run_finished(instance_id);
+@@ -150,6 +123,131 @@ pub fn handle_task_callback(
+             );
+         }
+     }
++    if is_succeeded && !effective_success {
++        Some("Tasker.Task.Failed")
++    } else {
++        None
++    }
++}
++
++// Returns (all queued tasks finished, current task succeeded). Unknown/internal IDs
++// and node-level failures do not change the queue. A recoverable node failure can
++// therefore still finish successfully through its pipeline's on_error branch.
++fn apply_task_callback(
++    state: &mut TaskRunState,
++    task_id: i64,
++    message: &str,
++    stopping: bool,
++) -> Option<(bool, bool)> {
++    let index = state.pending_task_ids.iter().position(|&id| id == task_id)?;
++    if message == "Tasker.Task.Starting" {
++        state.current_task_index = index;
++        if !stopping {
++            if let Some(selected_id) = state.mappings.get(&task_id).cloned() {
++                state.statuses.insert(selected_id, "running".to_string());
++            }
++        }
++        return Some((false, false));
++    }
++    if message != "Tasker.Task.Succeeded" && message != "Tasker.Task.Failed" {
++        return None;
++    }
++    let selected_id = state.mappings.get(&task_id).cloned();
++    // Preserve a failure already recorded by MXU's explicit stop command, even if
++    // a late native completion arrives after the Tasker stopping flag has cleared.
++    let already_cancelled = state.overall_status.as_deref() == Some("Failed") &&
++        selected_id.as_ref().and_then(|id| state.statuses.get(id)).map(String::as_str) == Some("failed");
++    let success = message == "Tasker.Task.Succeeded" && !stopping && !already_cancelled;
++    if let Some(id) = selected_id {
++        state.statuses.insert(id, if success { "succeeded" } else { "failed" }.to_string());
++    }
++    if stopping {
++        // post_stop clears native pending tasks without emitting completion callbacks.
++        for status in state.statuses.values_mut() {
++            if status == "pending" || status == "running" {
++                *status = "failed".to_string();
++            }
++        }
++    }
++    let all_done = state.pending_task_ids.iter().all(|id| {
++        state.mappings.get(id).and_then(|selected| state.statuses.get(selected))
++            .map(|status| status == "succeeded" || status == "failed").unwrap_or(false)
++    });
++    if all_done {
++        state.overall_status = Some(if state.statuses.values().any(|status| status == "failed") {
++            "Failed"
++        } else {
++            "Succeeded"
++        }.to_string());
++    }
++    Some((all_done, success))
++}
++
++#[cfg(test)]
++mod bjx_update_task_callbacks {
++    use super::*;
++
++    fn queue() -> TaskRunState {
++        let mut state = TaskRunState::default();
++        for id in 1..=3 {
++            let selected = format!("selected-{id}");
++            state.pending_task_ids.push(id);
++            state.statuses.insert(selected.clone(), "pending".to_string());
++            state.mappings.insert(id, selected);
++        }
++        state.overall_status = Some("Running".to_string());
++        state
++    }
++
++    #[test]
++    fn external_stop_normalizes_success_and_settles_cleared_queue() {
++        let mut state = queue();
++        assert_eq!(apply_task_callback(&mut state, 1, "Tasker.Task.Starting", false), Some((false, false)));
++        // The custom action fails and synchronously posts a whole-queue stop.
++        assert_eq!(apply_task_callback(&mut state, 1, "Node.Action.Failed", true), None);
++        assert_eq!(apply_task_callback(&mut state, 1, "Tasker.Task.Succeeded", true), Some((true, false)));
++        assert!(state.statuses.values().all(|status| status == "failed"));
++        assert_eq!(state.overall_status.as_deref(), Some("Failed"));
++        // MaaTaskerPostStop has a separate unmapped ID and cannot overwrite the outcome.
++        assert_eq!(apply_task_callback(&mut state, 4, "Tasker.Task.Starting", true), None);
++        assert_eq!(apply_task_callback(&mut state, 4, "Tasker.Task.Succeeded", true), None);
++        assert_eq!(state.overall_status.as_deref(), Some("Failed"));
++    }
++
++    #[test]
++    fn recoverable_node_failure_does_not_fail_or_cancel_later_tasks() {
++        let mut state = queue();
++        apply_task_callback(&mut state, 1, "Tasker.Task.Starting", false);
++        assert_eq!(apply_task_callback(&mut state, 1, "Node.Action.Failed", false), None);
++        assert_eq!(apply_task_callback(&mut state, 1, "Tasker.Task.Succeeded", false), Some((false, true)));
++        assert_eq!(state.statuses["selected-2"], "pending");
++        for id in 2..=3 {
++            apply_task_callback(&mut state, id, "Tasker.Task.Starting", false);
++            apply_task_callback(&mut state, id, "Tasker.Task.Succeeded", false);
++        }
++        assert_eq!(state.overall_status.as_deref(), Some("Succeeded"));
++    }
++
++    #[test]
++    fn explicit_stop_and_prior_success_are_preserved() {
++        let mut state = queue();
++        apply_task_callback(&mut state, 1, "Tasker.Task.Succeeded", false);
++        apply_task_callback(&mut state, 2, "Tasker.Task.Starting", false);
++        assert_eq!(apply_task_callback(&mut state, 2, "Tasker.Task.Succeeded", true), Some((true, false)));
++        assert_eq!(state.statuses["selected-1"], "succeeded");
++        assert_eq!(state.statuses["selected-2"], "failed");
++        assert_eq!(state.statuses["selected-3"], "failed");
++        // A delayed completion after stopping becomes false must not turn red back to green.
++        assert_eq!(apply_task_callback(&mut state, 2, "Tasker.Task.Succeeded", false), Some((true, false)));
++    }
++
++    #[test]
++    fn normal_task_failure_keeps_the_existing_continue_policy() {
++        let mut state = queue();
++        assert_eq!(apply_task_callback(&mut state, 1, "Tasker.Task.Failed", false), Some((false, false)));
++        assert_eq!(state.statuses["selected-2"], "pending");
++        assert_eq!(state.overall_status.as_deref(), Some("Running"));
++    }
+ }
+ 
+ /// 发送配置变更事件（双通道：WS 浏览器客户端 + Tauri WebView）
 diff --git a/src-tauri/src/lib.rs b/src-tauri/src/lib.rs
 index 6cd8b24..440ba64 100644
 --- a/src-tauri/src/lib.rs
