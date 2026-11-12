@@ -1,5 +1,5 @@
 diff --git a/package.json b/package.json
-index 3acd2c9..d8f756a 100644
+index 3acd2c9..bd9d2e7 100644
 --- a/package.json
 +++ b/package.json
 @@ -1,7 +1,7 @@
@@ -7,12 +7,12 @@ index 3acd2c9..d8f756a 100644
    "name": "mxu",
    "private": true,
 -  "version": "0.1.0",
-+  "version": "2.8.0-bjx.2",
++  "version": "2.8.0-bjx.3",
    "type": "module",
    "scripts": {
      "dev": "vite",
 diff --git a/src-tauri/Cargo.lock b/src-tauri/Cargo.lock
-index 326ffe3..d922e20 100644
+index 326ffe3..25e1726 100644
 --- a/src-tauri/Cargo.lock
 +++ b/src-tauri/Cargo.lock
 @@ -3127,7 +3127,7 @@ dependencies = [
@@ -20,19 +20,19 @@ index 326ffe3..d922e20 100644
  [[package]]
  name = "mxu"
 -version = "0.1.0"
-+version = "2.8.0-bjx.2"
++version = "2.8.0-bjx.3"
  dependencies = [
   "axum",
   "base64 0.22.1",
 diff --git a/src-tauri/Cargo.toml b/src-tauri/Cargo.toml
-index a1c34f0..4672820 100644
+index a1c34f0..5806d10 100644
 --- a/src-tauri/Cargo.toml
 +++ b/src-tauri/Cargo.toml
 @@ -1,6 +1,6 @@
  [package]
  name = "mxu"
 -version = "0.1.0"
-+version = "2.8.0-bjx.2"
++version = "2.8.0-bjx.3"
  description = "A Tauri App"
  authors = ["you"]
  edition = "2021"
@@ -591,7 +591,7 @@ index 6cd8b24..440ba64 100644
              commands::update::fallback_update,
              commands::update::move_file_to_old,
 diff --git a/src-tauri/tauri.conf.json b/src-tauri/tauri.conf.json
-index f98495c..739f949 100644
+index f98495c..0e4afe2 100644
 --- a/src-tauri/tauri.conf.json
 +++ b/src-tauri/tauri.conf.json
 @@ -1,7 +1,7 @@
@@ -599,7 +599,7 @@ index f98495c..739f949 100644
    "$schema": "https://schema.tauri.app/config/2",
    "productName": "mxu",
 -  "version": "0.1.0",
-+  "version": "2.8.0-bjx.2",
++  "version": "2.8.0-bjx.3",
    "identifier": "com.misteo.mxu",
    "build": {
      "beforeDevCommand": "pnpm dev",
@@ -653,6 +653,57 @@ index 8bd0343..64e954e 100644
            log.info(`非正式版本 (${result.interface.version})，跳过自动更新检查`);
          } else {
            const appState = useAppStore.getState();
+diff --git a/src/components/DashboardView.tsx b/src/components/DashboardView.tsx
+index 29dac3e..2e39f25 100644
+--- a/src/components/DashboardView.tsx
++++ b/src/components/DashboardView.tsx
+@@ -41,6 +41,7 @@ import { isTaskCompatible } from '@/stores/helpers';
+ import { isPretaskName, getPretaskItem, buildPretaskArgs, buildPretaskDef } from '@/types/pretasks';
+ import { startGlobalCallbackListener } from '@/components/connection/callbackCache';
+ import { stopInstanceTasks } from '@/services/taskStopService';
++import { taskStartService } from '@/services/taskStartService';
+ import { buildPiEnvVars } from '@/utils/piEnv';
+ import {
+   formatCheckboxCountViolation,
+@@ -117,7 +118,9 @@ function InstanceCard({ instanceId, instanceName, isActive, onSelect }: Instance
+   const isRunning = instance?.isRunning || false;
+   const tasks = instance?.selectedTasks || [];
+   const enabledTasks = tasks.filter((t) => t.enabled);
+-  const canRun = isConnected && isResourceLoaded && enabledTasks.length > 0;
++  const canRun =
++    enabledTasks.length > 0 &&
++    (Boolean(projectInterface?.startup_guard) || (isConnected && isResourceLoaded));
+ 
+   // 获取当前控制器和资源名（用于 pipeline override 生成）
+   const currentControllerName =
+@@ -214,6 +217,27 @@ function InstanceCard({ instanceId, instanceName, isActive, onSelect }: Instance
+ 
+       if (!instance || (!canRun && !isRunning)) return;
+ 
++      // Guarded projects share Toolbar's startup/pre-action lock, cancellation and task wrapping.
++      // Keep the legacy Dashboard path unchanged for projects without the extension.
++      if (projectInterface?.startup_guard) {
++        if (isRunning) {
++          setIsStopping(true);
++          try {
++            await taskStartService.stop(instanceId);
++          } finally {
++            setIsStopping(false);
++          }
++        } else {
++          setIsStarting(true);
++          try {
++            await taskStartService.start(instance);
++          } finally {
++            setIsStarting(false);
++          }
++        }
++        return;
++      }
++
+       if (isRunning) {
+         // 停止任务
+         try {
 diff --git a/src/components/InstallConfirmModal.tsx b/src/components/InstallConfirmModal.tsx
 index abc1cc8..922c872 100644
 --- a/src/components/InstallConfirmModal.tsx
@@ -697,18 +748,61 @@ index 8280e91..365e3d5 100644
    // 当前高亮的 section
    const [activeSection, setActiveSection] = useState('appearance');
 diff --git a/src/components/Toolbar.tsx b/src/components/Toolbar.tsx
-index 505ea10..dc13513 100644
+index 505ea10..211d718 100644
 --- a/src/components/Toolbar.tsx
 +++ b/src/components/Toolbar.tsx
-@@ -62,6 +62,7 @@ import {
+@@ -62,6 +62,13 @@ import {
  import { scheduleService } from '@/services/scheduleService';
  import { stopInstanceTasks } from '@/services/taskStopService';
  import { taskStartService, type TaskStartOptions } from '@/services/taskStartService';
 +import { runPretaskSequence, findWindowAfterPretask } from '@/services/pretaskService';
++import {
++  buildStartupGuardPlan,
++  runStartupGuard,
++  wrapTaskWithStartupGuard,
++  STARTUP_GUARD_INVALID,
++} from '@/services/startupGuard';
  import { isTaskSelectedForRun, filterTasksForRun } from '@/utils/taskRunFilter';
  import { isTauri } from '@/utils/paths';
  import { onStateChanged } from '@/services/wsService';
-@@ -491,41 +492,39 @@ export function Toolbar({ showAddPanel, onToggleAddPanel, className }: ToolbarPr
+@@ -473,6 +480,36 @@ export function Toolbar({ showAddPanel, onToggleAddPanel, className }: ToolbarPr
+       }
+ 
+       try {
++        const startupGuardPlan = buildStartupGuardPlan(
++          projectInterface,
++          compatibleTasks,
++          useAppStore.getState().globalOptionValues,
++          controllerName,
++          resourceName,
++        );
++        if (startupGuardPlan) {
++          await beginPreActionControl(targetId);
++          updateInstance(targetId, { isRunning: true });
++          try {
++            addLog(targetId, { type: 'info', message: t('action.startupGuardStarting') });
++            await runStartupGuard(startupGuardPlan, {
++              throwIfStopped: () => throwIfPreActionStopped(targetId),
++              run: (plan) => maaService.runPretask(targetId, plan.exec, plan.args, basePath),
++              exitCodeError: (code) =>
++                code === 22
++                  ? PRE_ACTION_CANCELLED_ERROR
++                  : code === 20
++                    ? t('action.startupGuardMaintenance')
++                    : code === 21
++                      ? t('action.startupGuardUnknown')
++                      : t('action.startupGuardExitCode', { code }),
++            });
++            addLog(targetId, { type: 'success', message: t('action.startupGuardCompleted') });
++          } finally {
++            await endPreActionControl(targetId);
++            updateInstance(targetId, { isRunning: false });
++          }
++        }
+         let needsReconnect = false;
+         let shouldDelayAfterAdbConnected = false;
+ 
+@@ -491,41 +528,39 @@ export function Toolbar({ showAddPanel, onToggleAddPanel, className }: ToolbarPr
  
          if (enabledPretasks.length > 0) {
            await beginPreActionControl(targetId);
@@ -775,7 +869,7 @@ index 505ea10..dc13513 100644
            } catch (err) {
              if ((err instanceof Error ? err.message : String(err)) === PRE_ACTION_CANCELLED_ERROR) {
                // 取消由外层统一处理，finally 会清理前置控制状态
-@@ -536,11 +535,27 @@ export function Toolbar({ showAddPanel, onToggleAddPanel, className }: ToolbarPr
+@@ -536,11 +571,27 @@ export function Toolbar({ showAddPanel, onToggleAddPanel, className }: ToolbarPr
                type: 'error',
                message: t('action.pretaskFailed', { error: String(err) }),
              });
@@ -803,7 +897,7 @@ index 505ea10..dc13513 100644
          // 收集所有启用且有程序路径的前置程序，按列表顺序执行
          const allPreActions = (targetInstance.preActions ?? []).filter(
            (a) => a.enabled && a.program.trim(),
-@@ -812,8 +827,15 @@ export function Toolbar({ showAddPanel, onToggleAddPanel, className }: ToolbarPr
+@@ -812,8 +863,15 @@ export function Toolbar({ showAddPanel, onToggleAddPanel, className }: ToolbarPr
              } else if (isDesktopWindowControllerType(controllerType) && savedDevice.windowName) {
                const { classRegex, titleRegex } = getDesktopWindowFilters(controller);
                const windows = await maaService.findWin32Windows(classRegex, titleRegex);
@@ -820,7 +914,7 @@ index 505ea10..dc13513 100644
                  return failStart(
                    t('taskList.autoConnect.windowNotFound', { name: savedDevice.windowName }),
                  );
-@@ -888,6 +910,9 @@ export function Toolbar({ showAddPanel, onToggleAddPanel, className }: ToolbarPr
+@@ -888,6 +946,9 @@ export function Toolbar({ showAddPanel, onToggleAddPanel, className }: ToolbarPr
              } else if (isDesktopWindowControllerType(controllerType)) {
                const { classRegex, titleRegex } = getDesktopWindowFilters(controller);
                const windows = await maaService.findWin32Windows(classRegex, titleRegex);
@@ -830,6 +924,47 @@ index 505ea10..dc13513 100644
                if (windows.length === 0) {
                  return failStart(t('taskList.autoConnect.noWindowFound'));
                }
+@@ -1194,7 +1255,7 @@ export function Toolbar({ showAddPanel, onToggleAddPanel, className }: ToolbarPr
+               selectedTask.taskName;
+             registerEntryTaskName(taskDef.entry, taskDisplayName);
+ 
+-            return {
++            return wrapTaskWithStartupGuard(startupGuardPlan, selectedTask.id, {
+               entry: taskDef.entry,
+               pipeline_override: generateTaskPipelineOverride(
+                 selectedTask,
+@@ -1210,7 +1271,7 @@ export function Toolbar({ showAddPanel, onToggleAddPanel, className }: ToolbarPr
+                 taskDef.option,
+                 specialTask?.optionDefs ?? projectInterface?.option,
+               ),
+-            };
++            });
+           },
+         );
+ 
+@@ -1289,7 +1350,9 @@ export function Toolbar({ showAddPanel, onToggleAddPanel, className }: ToolbarPr
+         const errMsg = err instanceof Error ? err.message : String(err);
+         const cancelled = errMsg === PRE_ACTION_CANCELLED_ERROR;
+         if (!cancelled) {
+-          const localizedErrMsg = errMsg
++          const localizedErrMsg = (
++            errMsg === STARTUP_GUARD_INVALID ? t('action.startupGuardInvalid') : errMsg
++          )
+             .replace(
+               ' [[hint:spawn_file_not_found]]',
+               ` ${t('taskList.autoConnect.agentSpawnHintFileNotFound')}`,
+@@ -1482,6 +1545,11 @@ export function Toolbar({ showAddPanel, onToggleAddPanel, className }: ToolbarPr
+     }
+   };
+ 
++  useEffect(() => {
++    taskStartService.setStopHandler(performStop);
++    return () => taskStartService.setStopHandler(null);
++  }, [performStop]);
++
+   const handleStartStop = async () => {
+     if (!instance) return;
+ 
 diff --git a/src/components/UpdatePanel.tsx b/src/components/UpdatePanel.tsx
 index e3e3bf3..ff3fc77 100644
 --- a/src/components/UpdatePanel.tsx
@@ -919,7 +1054,7 @@ index bd9aaf3..ccc06f4 100644
              {/* 代理设置 */}
              {!isProxyDisabled && (
 diff --git a/src/i18n/locales/en-US.ts b/src/i18n/locales/en-US.ts
-index dd052f0..7b9e298 100644
+index dd052f0..fc85962 100644
 --- a/src/i18n/locales/en-US.ts
 +++ b/src/i18n/locales/en-US.ts
 @@ -1,4 +1,12 @@
@@ -944,8 +1079,21 @@ index dd052f0..7b9e298 100644
        connectFailed: 'Auto connect failed',
        retryConnect: 'Connection failed, retry {{attempt}}...',
        autoSelectedDevice:
+@@ -352,6 +362,12 @@ export default {
+     pretaskCompleted: 'Pre-task completed: {{name}}',
+     pretaskExitCode: 'Pre-task exit code: {{code}}',
+     pretaskFailed: 'Pre-task failed: {{error}}',
++    startupGuardStarting: 'Checking server status for this run…',
++    startupGuardCompleted: 'Server check passed; continuing startup',
++    startupGuardMaintenance: 'Server maintenance; this task queue was skipped',
++    startupGuardUnknown: 'Server status unknown; this task queue was skipped',
++    startupGuardExitCode: 'Startup check failed with exit code: {{code}}',
++    startupGuardInvalid: 'Invalid startup-check configuration; this run was stopped',
+     preActionConnectDelay: 'Waiting {{seconds}} seconds before connecting...',
+     removeConfirmTitle: 'Delete pre-action',
+     removeConfirmMessage: 'Are you sure you want to delete this pre-action?',
 diff --git a/src/i18n/locales/ja-JP.ts b/src/i18n/locales/ja-JP.ts
-index 52e6a68..bd2c039 100644
+index 52e6a68..bd0c5ae 100644
 --- a/src/i18n/locales/ja-JP.ts
 +++ b/src/i18n/locales/ja-JP.ts
 @@ -1,4 +1,12 @@
@@ -970,8 +1118,21 @@ index 52e6a68..bd2c039 100644
        connectFailed: '自動接続に失敗しました',
        retryConnect: '接続失敗、リトライ {{attempt}}...',
        autoSelectedDevice:
+@@ -347,6 +357,12 @@ export default {
+     pretaskCompleted: '事前タスクが完了しました: {{name}}',
+     pretaskExitCode: '事前タスク終了コード: {{code}}',
+     pretaskFailed: '事前タスクの実行に失敗しました: {{error}}',
++    startupGuardStarting: '今回のタスクのサーバー状態を確認中…',
++    startupGuardCompleted: 'サーバー確認が完了しました。起動を続行します',
++    startupGuardMaintenance: 'サーバーメンテナンスのため今回のタスクをスキップしました',
++    startupGuardUnknown: 'サーバー状態を確認できないため今回のタスクをスキップしました',
++    startupGuardExitCode: '起動前確認に失敗しました。終了コード: {{code}}',
++    startupGuardInvalid: '起動前確認の設定が無効です。実行を停止しました',
+     preActionConnectDelay: '{{seconds}} 秒後に接続します...',
+     removeConfirmTitle: '前処理プログラムを削除',
+     removeConfirmMessage: 'この前処理プログラムを削除してもよろしいですか？',
 diff --git a/src/i18n/locales/ko-KR.ts b/src/i18n/locales/ko-KR.ts
-index 0491740..7ad313e 100644
+index 0491740..d8ba893 100644
 --- a/src/i18n/locales/ko-KR.ts
 +++ b/src/i18n/locales/ko-KR.ts
 @@ -1,4 +1,12 @@
@@ -995,8 +1156,21 @@ index 0491740..7ad313e 100644
        connectFailed: '자동 연결에 실패했습니다',
        retryConnect: '연결 실패, {{attempt}}번째 재시도...',
        autoSelectedDevice:
+@@ -342,6 +351,12 @@ export default {
+     pretaskCompleted: '사전 작업 완료: {{name}}',
+     pretaskExitCode: '사전 작업 종료 코드: {{code}}',
+     pretaskFailed: '사전 작업 실행 실패: {{error}}',
++    startupGuardStarting: '이번 작업의 서버 상태를 확인하는 중…',
++    startupGuardCompleted: '서버 확인을 통과하여 시작을 계속합니다',
++    startupGuardMaintenance: '서버 점검으로 이번 작업 대기열을 건너뛰었습니다',
++    startupGuardUnknown: '서버 상태를 알 수 없어 이번 작업 대기열을 건너뛰었습니다',
++    startupGuardExitCode: '시작 확인 실패, 종료 코드: {{code}}',
++    startupGuardInvalid: '시작 확인 설정이 잘못되어 작업을 중지했습니다',
+     preActionConnectDelay: '{{seconds}}초 후 연결합니다...',
+     removeConfirmTitle: '전처리 프로그램 삭제',
+     removeConfirmMessage: '이 전처리 프로그램을 삭제하시겠습니까?',
 diff --git a/src/i18n/locales/zh-CN.ts b/src/i18n/locales/zh-CN.ts
-index cdbca16..fef2f42 100644
+index cdbca16..f78dd1b 100644
 --- a/src/i18n/locales/zh-CN.ts
 +++ b/src/i18n/locales/zh-CN.ts
 @@ -1,4 +1,11 @@
@@ -1019,8 +1193,21 @@ index cdbca16..fef2f42 100644
        connectFailed: '自动连接失败',
        retryConnect: '连接失败，第 {{attempt}} 次重试...',
        autoSelectedDevice:
+@@ -340,6 +348,12 @@ export default {
+     pretaskCompleted: '预任务执行完成: {{name}}',
+     pretaskExitCode: '预任务退出码: {{code}}',
+     pretaskFailed: '预任务执行失败: {{error}}',
++    startupGuardStarting: '正在检查本次任务的区服状态…',
++    startupGuardCompleted: '区服检查通过，继续启动任务',
++    startupGuardMaintenance: '服务器维护，本次任务队列已跳过',
++    startupGuardUnknown: '服务器状态未知，本次任务队列已跳过',
++    startupGuardExitCode: '启动检查未通过，退出码: {{code}}',
++    startupGuardInvalid: '启动检查配置无效，已停止本次任务',
+     preActionConnectDelay: '等待 {{seconds}} 秒后连接...',
+     removeConfirmTitle: '删除前置程序',
+     removeConfirmMessage: '确定要删除这个前置程序吗？',
 diff --git a/src/i18n/locales/zh-TW.ts b/src/i18n/locales/zh-TW.ts
-index fa4098b..8d8a9fe 100644
+index fa4098b..7f6258f 100644
 --- a/src/i18n/locales/zh-TW.ts
 +++ b/src/i18n/locales/zh-TW.ts
 @@ -1,4 +1,11 @@
@@ -1043,6 +1230,19 @@ index fa4098b..8d8a9fe 100644
        connectFailed: '自動連接失敗',
        retryConnect: '連接失敗，第 {{attempt}} 次重試...',
        autoSelectedDevice:
+@@ -336,6 +344,12 @@ export default {
+     pretaskCompleted: '預任務執行完成: {{name}}',
+     pretaskExitCode: '預任務結束碼: {{code}}',
+     pretaskFailed: '預任務執行失敗: {{error}}',
++    startupGuardStarting: '正在檢查本次任務的伺服器狀態…',
++    startupGuardCompleted: '伺服器檢查通過，繼續啟動任務',
++    startupGuardMaintenance: '伺服器維護，本次任務佇列已略過',
++    startupGuardUnknown: '伺服器狀態未知，本次任務佇列已略過',
++    startupGuardExitCode: '啟動檢查未通過，結束碼: {{code}}',
++    startupGuardInvalid: '啟動檢查設定無效，已停止本次任務',
+     preActionConnectDelay: '等待 {{seconds}} 秒後連線...',
+     removeConfirmTitle: '刪除前置程式',
+     removeConfirmMessage: '確定要刪除這個前置程式嗎？',
 diff --git a/src/services/githubUpdate.ts b/src/services/githubUpdate.ts
 new file mode 100644
 index 0000000..960f6ba
@@ -1138,6 +1338,19 @@ index 0000000..960f6ba
 +    sha256, updateType: 'full' as const, downloadSource: 'github' as const,
 +  };
 +}
+diff --git a/src/services/maaService.ts b/src/services/maaService.ts
+index 62be25e..54c25d5 100644
+--- a/src/services/maaService.ts
++++ b/src/services/maaService.ts
+@@ -1103,7 +1103,7 @@ export const maaService = {
+     if (!isTauri()) {
+       throw new Error('此功能仅在 Tauri 环境中可用');
+     }
+-    log.info('执行预任务:', program, args);
++    log.info('执行预任务:', program, { argumentCount: args.length });
+     const exitCode = await invoke<number>('run_pretask', {
+       instanceId,
+       program,
 diff --git a/src/services/pretaskService.ts b/src/services/pretaskService.ts
 new file mode 100644
 index 0000000..6ee1c59
@@ -1195,6 +1408,225 @@ index 8db61d1..576c55b 100644
  }
  
  /**
+diff --git a/src/services/startupGuard.ts b/src/services/startupGuard.ts
+new file mode 100644
+index 0000000..193d5f2
+--- /dev/null
++++ b/src/services/startupGuard.ts
+@@ -0,0 +1,190 @@
++import type {
++  OptionDefinition,
++  OptionValue,
++  ProjectInterface,
++  SelectedTask,
++} from '@/types/interface';
++import type { TaskConfig } from '@/types/maa';
++import {
++  buildPretaskDef,
++  getPretaskItem,
++  getPretaskItems,
++  isPretaskName,
++  pretaskName,
++  serializePretaskOptions,
++} from '@/types/pretasks';
++import { getMxuSpecialTask } from '@/types/specialTasks';
++import { isTaskCompatible } from '@/stores/helpers';
++
++export const STARTUP_GUARD_INVALID = 'MXU_STARTUP_GUARD_INVALID';
++
++export interface StartupGuardPayload {
++  run_id: string;
++  options: Record<string, unknown>;
++  tasks: { name: string; entry: string; options: Record<string, unknown> }[];
++}
++
++export interface StartupGuardPlan {
++  exec: string;
++  args: string[];
++  entry: string;
++  payload: StartupGuardPayload;
++  taskIndexById: ReadonlyMap<string, number>;
++}
++
++function validKeys(value: unknown): value is string[] | undefined {
++  return (
++    value === undefined ||
++    (Array.isArray(value) && value.every((key) => typeof key === 'string' && key.length > 0))
++  );
++}
++
++/** Reuse PI value/default semantics, then project the explicit allowlist and remove password fields. */
++function allowedOptions(
++  referencedKeys: string[] | undefined,
++  allowlist: string[] | undefined,
++  values: Record<string, OptionValue>,
++  pi: ProjectInterface,
++  allOptions: Record<string, OptionDefinition>,
++  controllerName?: string,
++  resourceName?: string,
++): Record<string, unknown> {
++  const serialized = serializePretaskOptions(
++    { exec: '', option: referencedKeys },
++    values,
++    { ...pi, option: allOptions },
++    controllerName,
++    resourceName,
++  );
++  const active = serialized ? (JSON.parse(serialized) as Record<string, unknown>) : {};
++  const entries: [string, unknown][] = [];
++  for (const key of new Set(allowlist ?? [])) {
++    if (!Object.prototype.hasOwnProperty.call(active, key)) continue;
++    const definition = allOptions[key];
++    let value = active[key];
++    if (definition?.type === 'input' || definition?.type === 'hotkey') {
++      const fields = definition.type === 'input' ? definition.inputs : definition.hotkeys;
++      const input = value as Record<string, unknown>;
++      value = Object.fromEntries(
++        fields.filter((field) => !field.password).map((field) => [field.name, input[field.name]]),
++      );
++    }
++    entries.push([key, value]);
++  }
++  return Object.fromEntries(entries);
++}
++
++/** The caller supplies this run's selected tasks, including one-shot/start-from filtering. */
++export function buildStartupGuardPlan(
++  pi: ProjectInterface | null | undefined,
++  selectedTasks: readonly SelectedTask[],
++  globalValues: Record<string, OptionValue>,
++  controllerName?: string,
++  resourceName?: string,
++): StartupGuardPlan | undefined {
++  const guard = pi?.startup_guard;
++  if (!guard || !pi) return undefined;
++  if (
++    typeof guard.exec !== 'string' ||
++    !guard.exec.trim() ||
++    typeof guard.entry !== 'string' ||
++    !guard.entry.trim() ||
++    !validKeys(guard.option) ||
++    !validKeys(guard.task_option) ||
++    (guard.args !== undefined &&
++      (!Array.isArray(guard.args) || !guard.args.every((arg) => typeof arg === 'string')))
++  ) {
++    throw new Error(STARTUP_GUARD_INVALID);
++  }
++  const pretaskOrder = getPretaskItems(pi).map(pretaskName);
++  const orderedTasks = [
++    ...selectedTasks
++      .filter((task) => isPretaskName(task.taskName))
++      .sort((a, b) => pretaskOrder.indexOf(a.taskName) - pretaskOrder.indexOf(b.taskName)),
++    ...selectedTasks.filter((task) => !isPretaskName(task.taskName)),
++  ];
++  const allOptions = pi.option ?? {};
++  const payload: StartupGuardPayload = {
++    run_id: crypto.randomUUID(),
++    options: allowedOptions(
++      guard.option,
++      guard.option,
++      globalValues,
++      pi,
++      allOptions,
++      controllerName,
++      resourceName,
++    ),
++    tasks: [],
++  };
++  const taskIndexById = new Map<string, number>();
++  for (const selected of orderedTasks) {
++    const pretask = getPretaskItem(pi, selected.taskName);
++    const special = getMxuSpecialTask(selected.taskName);
++    const definition = pretask
++      ? buildPretaskDef(pretask)
++      : (special?.taskDef ?? pi.task.find((task) => task.name === selected.taskName));
++    if (!definition || !isTaskCompatible(definition, controllerName, resourceName)) continue;
++    if (taskIndexById.has(selected.id) || definition.entry === guard.entry)
++      throw new Error(STARTUP_GUARD_INVALID);
++    taskIndexById.set(selected.id, payload.tasks.length);
++    payload.tasks.push({
++      name: selected.taskName,
++      entry: definition.entry,
++      options: allowedOptions(
++        definition.option,
++        guard.task_option,
++        selected.optionValues ?? {},
++        pi,
++        special?.optionDefs ?? allOptions,
++        controllerName,
++        resourceName,
++      ),
++    });
++  }
++  return {
++    exec: guard.exec,
++    args: [...(guard.args ?? []), JSON.stringify(payload)],
++    entry: guard.entry,
++    payload,
++    taskIndexById,
++  };
++}
++
++/** Append the guard last so task/global overrides cannot replace its payload or successor. */
++export function wrapTaskWithStartupGuard(
++  plan: StartupGuardPlan | undefined,
++  selectedTaskId: string,
++  config: TaskConfig,
++): TaskConfig {
++  if (!plan) return config;
++  const taskIndex = plan.taskIndexById.get(selectedTaskId);
++  if (taskIndex === undefined || config.entry !== plan.payload.tasks[taskIndex].entry)
++    throw new Error(STARTUP_GUARD_INVALID);
++  const original = JSON.parse(config.pipeline_override) as unknown;
++  if (original === null || typeof original !== 'object') throw new Error(STARTUP_GUARD_INVALID);
++  const overrides = Array.isArray(original) ? [...original] : [original];
++  overrides.push({
++    [plan.entry]: {
++      enabled: true,
++      custom_action_param: { ...plan.payload, task_index: taskIndex },
++      next: [config.entry],
++    },
++  });
++  return { ...config, entry: plan.entry, pipeline_override: JSON.stringify(overrides) };
++}
++
++export async function runStartupGuard(
++  plan: StartupGuardPlan | undefined,
++  callbacks: {
++    throwIfStopped: () => void;
++    run: (plan: StartupGuardPlan) => Promise<number>;
++    exitCodeError: (code: number) => string;
++  },
++): Promise<void> {
++  if (!plan) return;
++  callbacks.throwIfStopped();
++  const code = await callbacks.run(plan);
++  callbacks.throwIfStopped();
++  if (code !== 0) throw new Error(callbacks.exitCodeError(code));
++}
+diff --git a/src/services/taskStartService.ts b/src/services/taskStartService.ts
+index 68a6a8f..1c7d453 100644
+--- a/src/services/taskStartService.ts
++++ b/src/services/taskStartService.ts
+@@ -13,11 +13,18 @@ export interface TaskStartOptions extends TaskRunFilterOptions {
+ export type TaskStartHandler = (instance: Instance, options?: TaskStartOptions) => Promise<boolean>;
+ 
+ let handler: TaskStartHandler | null = null;
++let stopHandler: ((instanceId: string) => Promise<boolean>) | null = null;
+ 
+ export const taskStartService = {
+   setHandler(fn: TaskStartHandler | null) {
+     handler = fn;
+   },
++  setStopHandler(fn: ((instanceId: string) => Promise<boolean>) | null) {
++    stopHandler = fn;
++  },
++  async stop(instanceId: string): Promise<boolean> {
++    return stopHandler ? stopHandler(instanceId) : false;
++  },
+ 
+   async start(instance: Instance, options?: TaskStartOptions): Promise<boolean> {
+     if (!handler) return false;
 diff --git a/src/services/updateService.ts b/src/services/updateService.ts
 index b98f555..3c65d36 100644
 --- a/src/services/updateService.ts
@@ -1379,6 +1811,50 @@ index 0931274..94f9d7b 100644
  };
  
  // 默认截图帧率
+diff --git a/src/types/interface.ts b/src/types/interface.ts
+index 523f5b7..a9ef68f 100644
+--- a/src/types/interface.ts
++++ b/src/types/interface.ts
+@@ -35,6 +35,8 @@ export interface ProjectInterface {
+   preset?: PresetItem[];
+   /** v2.7.0: Controller 启动前执行的预任务声明 */
+   pretask?: PretaskItem | PretaskItem[];
++  /** MXU extension: mandatory guard before startup and every ordinary task. */
++  startup_guard?: StartupGuardConfig;
+   /** v2.9.0: 匿名遥测（数据埋点）配置容器 */
+   telemetry?: TelemetryConfig;
+ }
+@@ -66,6 +68,17 @@ export interface SentryTelemetryConfig {
+  * v2.7.0: 预任务（pretask）配置项。
+  * 由项目在 interface.json 中声明，Client 应在连接 Controller 前按顺序执行这些外部程序。
+  */
++export interface StartupGuardConfig {
++  exec: string;
++  args?: string[];
++  /** Explicit global-option allowlist; password inputs are never serialized. */
++  option?: string[];
++  /** Explicit task-option allowlist, intersected with each task's active options. */
++  task_option?: string[];
++  /** Resource-defined guard node; the original task entry becomes its next node. */
++  entry: string;
++}
++
+ export interface PretaskItem {
+   /** 要执行的程序路径，可以是系统 PATH 中的可执行文件 */
+   exec: string;
+diff --git a/src/utils/logger.ts b/src/utils/logger.ts
+index a1bfa7b..0487f59 100644
+--- a/src/utils/logger.ts
++++ b/src/utils/logger.ts
+@@ -10,7 +10,7 @@ import { getDebugDir, isTauri as checkTauri } from './paths';
+ export type LogLevel = 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'silent';
+ 
+ // 根据环境设置默认日志级别
+-const isDev = import.meta.env.DEV;
++const isDev = import.meta.env?.DEV ?? false;
+ const defaultLevel: LogLevel = isDev ? 'trace' : 'debug';
+ 
+ // 文件日志配置
 diff --git a/tests/githubInstall.test.ts b/tests/githubInstall.test.ts
 new file mode 100644
 index 0000000..89b5afc
@@ -1508,16 +1984,22 @@ index 0000000..664704c
 +});
 diff --git a/tests/pretaskStart.test.ts b/tests/pretaskStart.test.ts
 new file mode 100644
-index 0000000..55b86bc
+index 0000000..f5d7ab3
 --- /dev/null
 +++ b/tests/pretaskStart.test.ts
-@@ -0,0 +1,272 @@
+@@ -0,0 +1,336 @@
 +import assert from 'node:assert/strict';
 +import test from 'node:test';
 +import { readFileSync } from 'node:fs';
 +import vm from 'node:vm';
 +import ts from 'typescript';
 +import { runPretaskSequence, findWindowAfterPretask } from '../src/services/pretaskService';
++import {
++  buildStartupGuardPlan,
++  runStartupGuard,
++  wrapTaskWithStartupGuard,
++  STARTUP_GUARD_INVALID,
++} from '../src/services/startupGuard';
 +
 +const CANCELLED = 'MXU_PRE_ACTION_CANCELLED';
 +
@@ -1636,8 +2118,10 @@ index 0000000..55b86bc
 +  mode: 'success' | 'nonzero' | 'throw' | 'cancel',
 +  onlyPretask = false,
 +  windowCount = 1,
++  guardMode?: 'success' | 'maintenance' | 'unknown' | 'cancel' | 'code22' | 'throw',
 +) {
 +  const calls: string[] = [];
++  const messages: string[] = [];
 +  let cancelled = false;
 +  const pretasks = [{ name: 'launch', exec: 'launch.exe' }];
 +  const selectedTasks = [{ id: 'launch', taskName: '__MXU_PRETASK__launch' }];
@@ -1654,12 +2138,20 @@ index 0000000..55b86bc
 +  const start = vm.runInNewContext(compiled, {
 +    Error,
 +    PRE_ACTION_CANCELLED_ERROR: CANCELLED,
++    STARTUP_GUARD_INVALID,
++    buildStartupGuardPlan,
++    runStartupGuard,
++    wrapTaskWithStartupGuard,
 +    lastStartCancelledRef,
 +    preActionControlledInstanceIdRef: { current: null },
 +    projectInterface: {
 +      controller: [{ name: 'game', type: 'Win32' }],
 +      resource: [{ name: 'game' }],
 +      pretask: pretasks,
++      task: [{ name: 'login', entry: 'Login' }],
++      startup_guard: guardMode
++        ? { exec: 'guard.exe', entry: 'Guard', args: ['--check'] }
++        : undefined,
 +    },
 +    selectedController: {},
 +    selectedResource: {},
@@ -1671,7 +2163,9 @@ index 0000000..55b86bc
 +    t: (key: string, values?: { code?: number }) =>
 +      values?.code === undefined ? key : `${key}: ${values.code}`,
 +    log: { info() {}, warn() {}, error() {} },
-+    addLog() {},
++    addLog(_id: string, item: { message: string }) {
++      messages.push(item.message);
++    },
 +    filterTasksForRun: (tasks: unknown) => tasks,
 +    resolveCompatTaskDef() {},
 +    isTaskCompatible: () => true,
@@ -1713,9 +2207,20 @@ index 0000000..55b86bc
 +    buildDesktopWindowControllerConfig: (_c: unknown, handle: number) => ({ handle }),
 +    maaService: {
 +      isWorkstationLocked: async () => false,
-+      runPretask: async () => {
-+        calls.push('pretask');
++      runPretask: async (_id: string, program: string) => {
++        calls.push(program === 'guard.exe' ? 'guard' : 'pretask');
 +        assert.equal(instance.isRunning, true, 'automatic updates must see startup as busy');
++        if (program === 'guard.exe') {
++          if (guardMode === 'throw') throw new Error('guard spawn failed');
++          if (guardMode === 'cancel') cancelled = true;
++          return guardMode === 'maintenance'
++            ? 20
++            : guardMode === 'unknown'
++              ? 21
++              : guardMode === 'code22'
++                ? 22
++                : 0;
++        }
 +        if (mode === 'throw') throw new Error('spawn failed');
 +        if (mode === 'cancel') cancelled = true;
 +        return mode === 'nonzero' ? 17 : 0;
@@ -1740,8 +2245,43 @@ index 0000000..55b86bc
 +      },
 +    },
 +  });
-+  return { calls, instance, ui, lastStartCancelledRef, run: () => start(instance) };
++  return { calls, messages, instance, ui, lastStartCancelledRef, run: () => start(instance) };
 +}
++
++test('Toolbar runs the mandatory guard before any launch pretask and shares the update-visible busy state', async () => {
++  const h = toolbarHarness('success', true, 1, 'success');
++  assert.equal(await h.run(), true);
++  assert.deepEqual(h.calls, ['begin', 'guard', 'end', 'begin', 'pretask', 'end']);
++  assert.equal(h.ui.status, 'Succeeded');
++});
++
++test('Toolbar maintenance, unknown status and spawn failures skip all later startup work', async () => {
++  for (const mode of ['maintenance', 'unknown', 'throw'] as const) {
++    const h = toolbarHarness('success', false, 1, mode);
++    assert.equal(await h.run(), false);
++    assert.deepEqual(h.calls, ['begin', 'guard', 'end']);
++    assert.equal(h.ui.status, 'Failed');
++    assert.equal(h.instance.isRunning, false);
++    if (mode !== 'throw')
++      assert.ok(
++        h.messages.some((message) =>
++          message.includes(
++            mode === 'maintenance' ? 'startupGuardMaintenance' : 'startupGuardUnknown',
++          ),
++        ),
++      );
++  }
++});
++
++test('Toolbar cancellation during guard or helper exit 22 never connects or launches the game', async () => {
++  for (const mode of ['cancel', 'code22'] as const) {
++    const h = toolbarHarness('success', false, 1, mode);
++    assert.equal(await h.run(), false);
++    assert.deepEqual(h.calls, ['begin', 'guard', 'end']);
++    assert.equal(h.ui.status, null);
++    assert.equal(h.lastStartCancelledRef.current, true);
++  }
++});
 +
 +test('Toolbar blocks controller connection after nonzero exit or spawn exception', async () => {
 +  for (const mode of ['nonzero', 'throw'] as const) {
@@ -1783,4 +2323,373 @@ index 0000000..55b86bc
 +    h.calls.some((call) => call.startsWith('connect:')),
 +    false,
 +  );
++});
+diff --git a/tests/startupGuard.test.ts b/tests/startupGuard.test.ts
+new file mode 100644
+index 0000000..4a5c632
+--- /dev/null
++++ b/tests/startupGuard.test.ts
+@@ -0,0 +1,363 @@
++import assert from 'node:assert/strict';
++import test from 'node:test';
++import { readFileSync } from 'node:fs';
++import vm from 'node:vm';
++import ts from 'typescript';
++import type { ProjectInterface, SelectedTask } from '../src/types/interface';
++import type { TaskConfig } from '../src/types/maa';
++import {
++  buildStartupGuardPlan,
++  runStartupGuard,
++  wrapTaskWithStartupGuard,
++} from '../src/services/startupGuard';
++import { taskStartService } from '../src/services/taskStartService';
++
++function project(): ProjectInterface {
++  return {
++    interface_version: 2,
++    name: 'fixture',
++    controller: [{ name: 'game', type: 'Win32' }],
++    resource: [{ name: 'game', path: ['./resource'] }],
++    startup_guard: {
++      exec: 'guard.exe',
++      args: ['--check'],
++      entry: 'Guard',
++      option: ['settings', 'mode'],
++      task_option: ['row', 'secret'],
++    },
++    pretask: [
++      { name: 'first', exec: 'first.exe' },
++      { name: 'second', exec: 'second.exe' },
++    ],
++    task: [
++      { name: 'login', entry: 'Login', option: ['row', 'secret'] },
++      { name: 'timer', entry: 'Timer' },
++      { name: 'game', entry: 'Game' },
++      { name: 'close', entry: 'Close' },
++      { name: 'other', entry: 'Other', controller: ['different'] },
++    ],
++    option: {
++      settings: {
++        type: 'input',
++        inputs: [
++          { name: 'server', default: 'fixture-server' },
++          { name: 'credential', password: true },
++        ],
++      },
++      mode: { cases: [{ name: 'yes', option: ['nested'] }], default_case: 'yes' },
++      nested: { type: 'input', inputs: [{ name: 'value', default: 'not-allowlisted' }] },
++      row: { type: 'input', inputs: [{ name: 'account_row', default: '1' }] },
++      secret: { type: 'input', inputs: [{ name: 'value', password: true }] },
++    },
++  };
++}
++function selected(id: string, name: string, row = '1'): SelectedTask {
++  return {
++    id,
++    taskName: name,
++    enabled: true,
++    expanded: false,
++    optionValues: {
++      row: { type: 'input', values: { account_row: row, extra: 'must-not-leak' } },
++      secret: { type: 'input', values: { value: 'SYNTHETIC_SECRET_ONLY' } },
++    },
++  };
++}
++function config(id: string, entry: string, override = '[]'): TaskConfig {
++  return { entry, pipeline_override: override, selected_task_id: id, task_name: entry };
++}
++
++test('payload allowlists global/task keys and removes password or undeclared input fields', () => {
++  const plan = buildStartupGuardPlan(
++    project(),
++    [selected('login', 'login'), selected('close', 'close')],
++    {
++      settings: {
++        type: 'input',
++        values: {
++          server: 'chosen-server',
++          credential: 'SYNTHETIC_SECRET_ONLY',
++          extra: 'must-not-leak',
++        },
++      },
++      unrelated: { type: 'input', values: { value: 'must-not-leak' } },
++    },
++    'game',
++    'game',
++  )!;
++  assert.deepEqual(plan.payload.options, { settings: { server: 'chosen-server' }, mode: 'yes' });
++  assert.deepEqual(plan.payload.tasks[0].options, { row: { account_row: '1' }, secret: {} });
++  assert.deepEqual(
++    plan.payload.tasks[1].options,
++    {},
++    'unrelated tasks do not acquire a default account row',
++  );
++  assert.equal(plan.args[0], '--check');
++  assert.deepEqual(JSON.parse(plan.args[1]), plan.payload);
++  assert.doesNotMatch(plan.args[1], /SYNTHETIC_SECRET_ONLY|must-not-leak|nested/);
++});
++
++test('complete payload orders pretasks first and maps repeated task names by selected ID', () => {
++  const pi = project();
++  const plan = buildStartupGuardPlan(
++    pi,
++    [
++      selected('two', 'login', '2'),
++      selected('b', '__MXU_PRETASK__second'),
++      selected('one', 'login', '1'),
++      selected('a', '__MXU_PRETASK__first'),
++      selected('wrong-controller', 'other'),
++    ],
++    {},
++    'game',
++    'game',
++  )!;
++  assert.deepEqual(
++    plan.payload.tasks.map((item) => item.name),
++    ['__MXU_PRETASK__first', '__MXU_PRETASK__second', 'login', 'login'],
++  );
++  assert.equal(plan.taskIndexById.get('two'), 2);
++  assert.equal(plan.taskIndexById.get('one'), 3);
++  assert.deepEqual(plan.payload.tasks[2].options.row, { account_row: '2' });
++  assert.deepEqual(plan.payload.tasks[3].options.row, { account_row: '1' });
++  assert.equal(plan.taskIndexById.has('wrong-controller'), false);
++});
++
++test('launch-only guard includes its pretask without needing an ordinary task', () => {
++  const plan = buildStartupGuardPlan(
++    project(),
++    [selected('launch', '__MXU_PRETASK__first')],
++    {},
++    'game',
++    'game',
++  )!;
++  assert.equal(plan.payload.tasks.length, 1);
++  assert.equal(plan.payload.tasks[0].name, '__MXU_PRETASK__first');
++  assert.equal(plan.payload.tasks[0].entry, 'MXU_PRETASK');
++});
++
++test('empty allowlists send only task identity even when saved options contain credentials', () => {
++  const pi = project();
++  pi.startup_guard!.option = [];
++  pi.startup_guard!.task_option = [];
++  const plan = buildStartupGuardPlan(
++    pi,
++    [selected('login', 'login'), selected('close', 'close')],
++    { settings: { type: 'input', values: { credential: 'SYNTHETIC_SECRET_ONLY' } } },
++    'game',
++    'game',
++  )!;
++  assert.deepEqual(plan.payload.options, {});
++  assert.deepEqual(plan.payload.tasks, [
++    { name: 'login', entry: 'Login', options: {} },
++    { name: 'close', entry: 'Close', options: {} },
++  ]);
++  assert.doesNotMatch(plan.args.at(-1)!, /SYNTHETIC_SECRET_ONLY|credential|account_row/);
++});
++
++test('one immutable run ID and detached options are shared by the helper and every task', () => {
++  const tasks = [selected('one', 'login', '1'), selected('two', 'login', '2')];
++  const values = { settings: { type: 'input' as const, values: { server: 'first-server' } } };
++  const plan = buildStartupGuardPlan(project(), tasks, values, 'game', 'game')!;
++  assert.match(
++    plan.payload.run_id,
++    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
++  );
++  values.settings.values.server = 'changed-server';
++  tasks[0].optionValues.row = { type: 'input', values: { account_row: '999' } };
++  const cliPayload = JSON.parse(plan.args.at(-1)!);
++  assert.deepEqual(cliPayload, plan.payload);
++  assert.deepEqual(plan.payload.options.settings, { server: 'first-server' });
++  assert.deepEqual(plan.payload.tasks[0].options.row, { account_row: '1' });
++  for (const task of tasks) {
++    const wrapped = wrapTaskWithStartupGuard(plan, task.id, config(task.id, 'Login'));
++    assert.equal(
++      JSON.parse(wrapped.pipeline_override).at(-1).Guard.custom_action_param.run_id,
++      plan.payload.run_id,
++    );
++  }
++  assert.notEqual(
++    buildStartupGuardPlan(project(), tasks, values, 'game', 'game')!.payload.run_id,
++    plan.payload.run_id,
++  );
++});
++
++test('every ordinary task keeps its own successor and index, including the task after a timer', () => {
++  const plan = buildStartupGuardPlan(
++    project(),
++    [
++      selected('launch', '__MXU_PRETASK__first'),
++      selected('wait', 'timer'),
++      selected('one', 'login', '1'),
++      selected('two', 'login', '2'),
++      selected('end', 'close'),
++    ],
++    {},
++    'game',
++    'game',
++  )!;
++  const originals = [
++    config(
++      'wait',
++      'Timer',
++      '[{"Timer":{"timeout":99}},{"Guard":{"enabled":false,"next":["Wrong"]}}]',
++    ),
++    config('one', 'Login', '{"Login":{"timeout":33}}'),
++    config('two', 'Login'),
++    config('end', 'Close'),
++  ];
++  const outputs = originals.map((item) =>
++    wrapTaskWithStartupGuard(plan, item.selected_task_id!, item),
++  );
++  outputs.forEach((item, index) => {
++    assert.equal(item.entry, 'Guard');
++    assert.equal(item.selected_task_id, originals[index].selected_task_id);
++    const overrides = JSON.parse(item.pipeline_override);
++    const gate = overrides.at(-1).Guard;
++    assert.equal(gate.enabled, true);
++    assert.deepEqual(gate.next, [originals[index].entry]);
++    assert.equal(gate.custom_action_param.task_index, index + 1);
++    assert.deepEqual(gate.custom_action_param.tasks, plan.payload.tasks);
++  });
++  assert.equal(JSON.parse(outputs[0].pipeline_override)[0].Timer.timeout, 99);
++  assert.equal(JSON.parse(outputs[1].pipeline_override)[0].Login.timeout, 33);
++  assert.equal(originals[0].entry, 'Timer');
++  assert.equal(originals[2].pipeline_override, '[]', 'wrapping must not mutate a later task');
++});
++
++test('missing ID, duplicate IDs and changed entry fail instead of bypassing the guard', () => {
++  const pi = project();
++  assert.throws(
++    () =>
++      buildStartupGuardPlan(
++        pi,
++        [selected('same', 'login'), selected('same', 'close')],
++        {},
++        'game',
++        'game',
++      ),
++    /MXU_STARTUP_GUARD_INVALID/,
++  );
++  const plan = buildStartupGuardPlan(pi, [selected('one', 'login')], {}, 'game', 'game')!;
++  assert.throws(
++    () => wrapTaskWithStartupGuard(plan, 'missing', config('one', 'Login')),
++    /MXU_STARTUP_GUARD_INVALID/,
++  );
++  assert.throws(
++    () => wrapTaskWithStartupGuard(plan, 'one', config('one', 'Other')),
++    /MXU_STARTUP_GUARD_INVALID/,
++  );
++});
++
++test('projects without startup_guard retain their task config and execute no helper', async () => {
++  const pi = project();
++  delete pi.startup_guard;
++  assert.equal(buildStartupGuardPlan(pi, [], {}), undefined);
++  const original = config('one', 'Login');
++  assert.equal(wrapTaskWithStartupGuard(undefined, 'one', original), original);
++  await runStartupGuard(undefined, {
++    throwIfStopped: () => assert.fail(),
++    run: async () => assert.fail(),
++    exitCodeError: String,
++  });
++});
++
++test('nonzero or cancelled startup checks never authorize later startup work', async () => {
++  const plan = buildStartupGuardPlan(project(), [], {})!;
++  for (const code of [20, 21, 22, 17]) {
++    const calls: string[] = [];
++    await assert.rejects(
++      async () => {
++        await runStartupGuard(plan, {
++          throwIfStopped() {},
++          run: async () => {
++            calls.push('guard');
++            return code;
++          },
++          exitCodeError: (value) => `exit ${value}`,
++        });
++        calls.push('launch/connect/task');
++      },
++      new RegExp(`exit ${code}`),
++    );
++    assert.deepEqual(calls, ['guard']);
++  }
++  let stopped = false;
++  await assert.rejects(
++    runStartupGuard(plan, {
++      throwIfStopped: () => {
++        if (stopped) throw new Error('cancelled');
++      },
++      run: async () => {
++        stopped = true;
++        return 0;
++      },
++      exitCodeError: String,
++    }),
++    /cancelled/,
++  );
++});
++
++function callbackFromFile(file: string, variable: string): string {
++  const source = readFileSync(new URL(file, import.meta.url), 'utf8');
++  const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
++  let callback: ts.Node | undefined;
++  function visit(node: ts.Node) {
++    if (
++      ts.isVariableDeclaration(node) &&
++      node.name.getText(ast) === variable &&
++      node.initializer &&
++      ts.isCallExpression(node.initializer)
++    )
++      callback = node.initializer.arguments[0];
++    ts.forEachChild(node, visit);
++  }
++  visit(ast);
++  assert.ok(callback);
++  return ts.transpile(`(${callback.getText(ast)})`, { target: ts.ScriptTarget.ES2022 });
++}
++
++test('Dashboard routes guarded start and stop to the same controlled instance handlers', async () => {
++  const code = callbackFromFile('../src/components/DashboardView.tsx', 'handleStartStop');
++  for (const running of [false, true]) {
++    const calls: string[] = [];
++    const instance = { id: 'target-instance' };
++    const callback = vm.runInNewContext(code, {
++      instance,
++      instanceId: instance.id,
++      canRun: true,
++      isRunning: running,
++      projectInterface: project(),
++      setIsStarting() {},
++      setIsStopping() {},
++      taskStartService: {
++        start: async (value: unknown) => {
++          assert.equal(value, instance);
++          calls.push('shared-start');
++        },
++        stop: async (id: string) => {
++          assert.equal(id, instance.id);
++          calls.push('shared-stop');
++        },
++      },
++    });
++    await callback({ stopPropagation() {} });
++    assert.deepEqual(calls, [running ? 'shared-stop' : 'shared-start']);
++  }
++});
++
++test('shared stop service forwards the target instance and does not invent success without a handler', async () => {
++  taskStartService.setStopHandler(null);
++  assert.equal(await taskStartService.stop('a'), false);
++  let target = '';
++  taskStartService.setStopHandler(async (id) => {
++    target = id;
++    return true;
++  });
++  try {
++    assert.equal(await taskStartService.stop('specific-instance'), true);
++    assert.equal(target, 'specific-instance');
++  } finally {
++    taskStartService.setStopHandler(null);
++  }
 +});

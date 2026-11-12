@@ -2,7 +2,7 @@
   "schema_version": 1,
   "upstream": "https://github.com/MaaXYZ/MXU.git",
   "revision": "5e923e83b30a102fb78da35c30ee2e1559aea682",
-  "runtime_version": "2.8.0-bjx.2",
-  "patch_sha256": "4d58080cbbf09c39f2eca4fa6c6c14eb6ae5d5309e2ad6edd578ffcd43fcbd72",
+  "runtime_version": "2.8.0-bjx.3",
+  "patch_sha256": "0888458e2434f78e54dd149c7c222f805b91aa7a5462ad31e61804dc931df9c2",
   "app_sha256": "c87e4ff7849546851a12b450d0efc3b5caa6e0ef16fa9d1d3fb90f421e4f9747"
 }

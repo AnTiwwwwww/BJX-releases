@@ -10,6 +10,10 @@ on:
         description: '验证成功后发布当前 interface.json 版本'
         type: boolean
         default: false
+      runtime_only:
+        description: '只构建并上传经过验证的 MXU 运行器及对应源码，不生成整包或发布 Release'
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -42,12 +46,28 @@ jobs:
           key: mxu-windows-2.8.0-${{ hashFiles('integrations/mxu/github-update.patch') }}
           restore-keys: mxu-windows-2.8.0-
       - name: Build verified BJX updater runtime
+        id: runtime
         run: |
           $ErrorActionPreference = 'Stop'
           npm install --global pnpm@10.28.0
           if ($LASTEXITCODE -ne 0) { throw 'pnpm install failed' }
           ./tools/build-mxu.ps1
+          $runtimeVersion = (Get-Content integrations/mxu/build.json -Raw | ConvertFrom-Json).runtime_version
+          "version=$runtimeVersion" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+      - name: Upload verified runtime and corresponding source
+        if: inputs.runtime_only
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: MXU-v${{ steps.runtime.outputs.version }}
+          path: |
+            build/mxu-patched/mxu.exe
+            build/mxu-patched/MXU-source-*.zip
+            build/mxu-patched/MXU-source-*.zip.sha256
+            build/mxu-patched/build-receipt.json
+          if-no-files-found: error
+          retention-days: 14
       - name: Validate version and build packages
+        if: ${{ !inputs.runtime_only }}
         id: package
         env:
           REF_TYPE: ${{ github.ref_type }}
@@ -69,6 +89,7 @@ jobs:
           Copy-Item -LiteralPath "build/mxu-patched/MXU-source-v$runtimeVersion.zip.sha256" -Destination export
           "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
       - name: Upload verified build
+        if: ${{ !inputs.runtime_only }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: BJX-v${{ steps.package.outputs.version }}
@@ -79,7 +100,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
       - name: Publish GitHub Release
-        if: github.ref_type == 'tag' || inputs.publish
+        if: ${{ !inputs.runtime_only && (github.ref_type == 'tag' || inputs.publish) }}
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
